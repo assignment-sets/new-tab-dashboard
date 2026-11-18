@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Tab Tasks",
   "description": "Tasks, pinned sites, and a local clock on your New Tab page.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "permissions": ["storage"],
   "host_permissions": ["https://api.open-meteo.com/*", "https://geocoding-api.open-meteo.com/*"],
   "icons": {
