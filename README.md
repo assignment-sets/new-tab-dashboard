@@ -51,4 +51,4 @@ test/        Node.js tests for task, pin, scratchpad, and weather logic
 
 ## License
 
-No license has been selected for this project yet.
+This project is available under the [MIT License](LICENSE).
