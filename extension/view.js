@@ -6,16 +6,21 @@ const isPopup = document.body.classList.contains('popup');
 workspace.innerHTML = `
     <header class="panel-bar">
       <h2>Tasks</h2>
-      <button class="secondary clear-tasks" type="button" aria-controls="clear-tasks-confirm" aria-expanded="false" disabled>Clear all</button>
+      <button class="secondary clear-tasks" type="button" aria-controls="task-dialog" aria-haspopup="dialog" disabled>Clear all</button>
     </header>
     <div class="workspace-body">
-      <div class="clear-tasks-confirm" id="clear-tasks-confirm" hidden>
-        <p>Delete all current and completed tasks?</p>
-        <div class="task-actions">
-          <button class="danger-action" id="confirm-clear-tasks" type="button">Delete all tasks</button>
-          <button class="secondary" id="cancel-clear-tasks" type="button">Cancel</button>
-        </div>
-      </div>
+      <dialog class="action-dialog" id="task-dialog" aria-labelledby="task-dialog-title">
+        <h3 id="task-dialog-title"></h3>
+        <form>
+          <label>Task title <input type="text" maxlength="${titleLimit}" required></label>
+          <p class="task-prompt"></p>
+          <p class="error" role="alert"></p>
+          <div class="dialog-actions">
+            <button class="secondary" type="button">Cancel</button>
+            <button type="submit"></button>
+          </div>
+        </form>
+      </dialog>
       <div class="task-tabs" role="tablist" aria-label="Task status">
         <button id="current-tab" type="button" role="tab" aria-selected="true" aria-controls="current-panel">Current</button>
         <button id="completed-tab" type="button" role="tab" aria-selected="false" aria-controls="completed-panel" tabindex="-1">Completed</button>
@@ -38,13 +43,17 @@ workspace.innerHTML = `
     </div>
 `;
 
-const form = workspace.querySelector('form');
+const form = workspace.querySelector('.composer');
 const input = document.querySelector('#title');
 const add = form.querySelector('button');
 const clear = workspace.querySelector('.clear-tasks');
-const clearConfirm = workspace.querySelector('.clear-tasks-confirm');
-const confirmClear = workspace.querySelector('#confirm-clear-tasks');
-const cancelClear = workspace.querySelector('#cancel-clear-tasks');
+const dialog = document.querySelector('#task-dialog');
+const editorForm = dialog.querySelector('form');
+const titleField = editorForm.querySelector('input');
+const prompt = editorForm.querySelector('.task-prompt');
+const confirm = editorForm.querySelector('[type="submit"]');
+const cancel = editorForm.querySelector('[type="button"]');
+const dialogError = dialog.querySelector('.error');
 const tabs = [...workspace.querySelectorAll('[role="tab"]')];
 const panels = tabs.map(tab => document.getElementById(tab.getAttribute('aria-controls')));
 const section = document.querySelector('#tasks');
@@ -52,7 +61,7 @@ panels[0].append(section);
 const list = document.querySelector('#task-list');
 const empty = workspace.querySelector('.empty');
 const more = document.querySelector('.more');
-const error = workspace.querySelector('.error');
+const error = section.querySelector('.error');
 const status = workspace.querySelector('[role="status"]');
 const completionDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
@@ -62,7 +71,7 @@ let showingHistory = false;
 let savingNewTask = false;
 let refreshVersion = 0;
 let loaded = false;
-let clearing = false;
+let submitting = false;
 let taskEditor = null;
 const pendingTasks = new Set();
 
@@ -71,14 +80,14 @@ function showError(message) {
   error.hidden = !message;
 }
 
-async function save(action) {
-  showError('');
+async function save(action, report = showError) {
+  report('');
   try {
     const result = await chrome.runtime.sendMessage({ kind: 'task-action', action });
     if (!result?.ok) throw new Error('Task write failed');
     return true;
   } catch {
-    showError('Couldn’t save the change. Try again.');
+    report('Couldn’t save the change. Try again.');
     return false;
   }
 }
@@ -99,24 +108,67 @@ function taskRow(id) {
 }
 
 function openTaskEditor(task, mode) {
-  if (pendingTasks.has(task.id)) return;
-  taskEditor = { id: task.id, mode, draft: task.title };
-  showError('');
-  render();
-  const field = taskRow(task.id)?.querySelector(mode === 'edit' ? 'input' : '[data-task-control="cancel"]');
-  field?.focus();
-  if (mode === 'edit') field?.select();
+  if (pendingTasks.has(task?.id)) return;
+  taskEditor = { id: task?.id, mode };
+  const editing = mode === 'edit';
+  const clearing = mode === 'clear';
+  dialog.querySelector('h3').textContent = editing ? 'Edit task' : clearing ? 'Clear all tasks?' : 'Delete task?';
+  titleField.parentElement.hidden = titleField.disabled = !editing;
+  titleField.value = task?.title ?? '';
+  prompt.hidden = editing;
+  prompt.textContent = clearing ? 'Delete all current and completed tasks?' : 'Delete “' + titleField.value + '”?';
+  confirm.textContent = editing ? 'Save' : clearing ? 'Delete all tasks' : 'Delete task';
+  confirm.className = editing ? 'primary' : 'danger-action';
+  dialogError.textContent = '';
+  dialog.showModal();
+  if (editing) {
+    titleField.focus();
+    titleField.select();
+  } else cancel.focus();
 }
 
-async function updateTask(task, type, message, title) {
+clear.addEventListener('click', () => openTaskEditor(null, 'clear'));
+cancel.addEventListener('click', () => dialog.close());
+dialog.addEventListener('cancel', event => {
+  if (submitting) event.preventDefault();
+});
+dialog.addEventListener('close', () => {
+  const { id, mode } = taskEditor;
+  const trigger = id ? taskRow(id)?.querySelector('[data-task-control="' + mode + '"]') : clear;
+  (trigger && !trigger.disabled ? trigger : tabs[Number(showingHistory)]).focus({ preventScroll: true });
+  taskEditor = null;
+});
+
+editorForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (submitting) return;
+  const { id, mode } = taskEditor;
+  const action = { type: mode, id };
+  if (mode === 'edit') {
+    action.title = titleField.value.trim();
+    if (!action.title) {
+      dialogError.textContent = 'Enter a task title.';
+      titleField.focus();
+      return;
+    }
+  }
+  submitting = titleField.readOnly = confirm.disabled = cancel.disabled = true;
+  const saved = await save(action, message => { dialogError.textContent = message; });
+  if (saved) {
+    status.textContent = { clear: 'All tasks deleted.', edit: 'Task updated.', delete: 'Task deleted.' }[mode];
+    await refresh();
+    dialog.close();
+  }
+  submitting = titleField.readOnly = confirm.disabled = cancel.disabled = false;
+});
+
+async function updateTask(task, type, message) {
   if (pendingTasks.has(task.id)) return;
-  const editor = taskEditor;
   pendingTasks.add(task.id);
   render();
-  const saved = await save({ type, id: task.id, title });
+  const saved = await save({ type, id: task.id });
   pendingTasks.delete(task.id);
   if (saved) {
-    if (taskEditor === editor && editor?.id === task.id) taskEditor = null;
     status.textContent = message;
     await refresh();
   } else {
@@ -124,66 +176,10 @@ async function updateTask(task, type, message, title) {
   }
 }
 
-function renderTaskEditor(row, task, editor) {
-  const editing = editor.mode === 'edit';
-  const form = document.createElement('form');
-  form.className = 'task-editor';
-  if (editing) {
-    const field = document.createElement('input');
-    field.className = 'edit-title';
-    field.type = 'text';
-    field.required = true;
-    field.maxLength = titleLimit;
-    field.value = editor.draft;
-    field.readOnly = pendingTasks.has(task.id);
-    field.dataset.taskControl = 'edit-title';
-    field.setAttribute('aria-label', 'Task title');
-    field.addEventListener('input', () => { editor.draft = field.value; });
-    form.append(field);
-  } else {
-    const prompt = document.createElement('p');
-    prompt.textContent = 'Delete “' + task.title + '”?';
-    form.append(prompt);
-  }
-
-  const actions = document.createElement('div');
-  actions.className = 'task-actions';
-  const confirm = taskButton(task, 'confirm', editing ? 'Save' : 'Delete task', editing ? 'primary' : 'danger-action');
-  confirm.type = 'submit';
-  const cancel = taskButton(task, 'cancel', 'Cancel', 'secondary', 'Cancel ' + editor.mode + ' for');
-  cancel.addEventListener('click', () => {
-    if (pendingTasks.has(task.id)) return;
-    taskEditor = null;
-    showError('');
-    render();
-    taskRow(task.id)?.querySelector('[data-task-control="' + editor.mode + '"]')?.focus();
-  });
-  form.addEventListener('submit', event => {
-    event.preventDefault();
-    const title = editor.draft.trim();
-    if (editing && !title) {
-      showError('Enter a task title.');
-      form.querySelector('input').focus();
-      return;
-    }
-    void updateTask(task, editor.mode, editing ? 'Task updated.' : 'Task deleted.', title);
-  });
-  form.addEventListener('keydown', event => {
-    if (event.key === 'Escape') cancel.click();
-  });
-  actions.append(confirm, cancel);
-  form.append(actions);
-  row.append(form);
-}
-
 function renderTask(task) {
   const completed = task.completedAt !== null;
   const row = document.createElement('li');
   row.dataset.taskId = task.id;
-  if (taskEditor?.id === task.id) {
-    renderTaskEditor(row, task, taskEditor);
-    return row;
-  }
   const details = document.createElement('div');
   const title = document.createElement('span');
   title.className = 'task-title';
@@ -229,13 +225,9 @@ function render() {
   const { active, preview, completed } = selectTasks(tasks);
   const visible = showingHistory ? completed : !isPopup || expanded ? active : preview;
   const selectedTab = tabs[Number(showingHistory)];
-  clear.disabled = clearing || tasks.length === 0;
-  if (!tasks.length && !clearConfirm.hidden) {
-    const confirmFocused = clearConfirm.contains(focused) || focused === clear;
-    setClearConfirm(false);
-    if (confirmFocused) selectedTab.focus();
-  }
-  if (taskEditor && !visible.some(task => task.id === taskEditor.id)) taskEditor = null;
+  clear.disabled = tasks.length === 0;
+  if (dialog.open && !submitting && (taskEditor.id
+    ? !visible.some(task => task.id === taskEditor.id) : !tasks.length)) dialog.close();
 
   section.setAttribute('aria-busy', 'false');
   empty.hidden = visible.length > 0;
@@ -338,45 +330,3 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.tasks) void refresh();
 });
 void refresh();
-
-function setClearConfirm(open) {
-  clearConfirm.hidden = !open;
-  clear.setAttribute('aria-expanded', String(open));
-}
-
-clear.addEventListener('click', () => {
-  setClearConfirm(clearConfirm.hidden);
-  if (!clearConfirm.hidden) cancelClear.focus();
-});
-
-function dismissClear() {
-  if (clearing) return;
-  setClearConfirm(false);
-  clear.focus();
-}
-
-cancelClear.addEventListener('click', dismissClear);
-clearConfirm.addEventListener('keydown', event => {
-  if (event.key === 'Escape') dismissClear();
-});
-
-confirmClear.addEventListener('click', async () => {
-  if (clearing) return;
-  clearing = true;
-  clear.disabled = true;
-  confirmClear.setAttribute('aria-disabled', 'true');
-  cancelClear.setAttribute('aria-disabled', 'true');
-  const saved = await save({ type: 'clear' });
-  clearing = false;
-  confirmClear.removeAttribute('aria-disabled');
-  cancelClear.removeAttribute('aria-disabled');
-  if (saved) {
-    const wasFocused = clearConfirm.contains(document.activeElement);
-    setClearConfirm(false);
-    if (wasFocused) tabs[Number(showingHistory)].focus();
-    status.textContent = 'All tasks deleted.';
-    await refresh();
-  } else {
-    render();
-  }
-});

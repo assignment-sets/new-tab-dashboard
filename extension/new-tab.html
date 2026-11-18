@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>New Tab · Tab Tasks</title>
-    <link rel="icon" href="icons/new-tab-blank.png">
+    <title>New Tab</title>
+    <link rel="icon" href="icons/chrome-favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
     <script type="module" src="view.js"></script>
     <script type="module" src="dashboard.js"></script>
@@ -13,32 +13,37 @@
   </head>
   <body class="new-tab">
     <main class="dashboard">
-      <div class="dashboard-sidebar">
-        <header class="clock panel" aria-label="Date, time, and weather">
-          <div class="clock-display">
-            <div class="clock-overview">
-              <div class="clock-details">
-                <time id="clock-time"></time>
-                <time id="clock-date"></time>
-                <div class="weather-reading">
-                  <p id="weather-summary" role="status">Weather</p>
-                  <div class="weather-city-row">
-                    <p id="weather-city" hidden></p>
-                    <button class="secondary" id="weather-edit" type="button"
-                      aria-expanded="false" aria-controls="weather-form">
-                      <span id="weather-edit-label">Add city</span>
-                      <span id="weather-pencil" aria-hidden="true" hidden>✎</span>
-                    </button>
-                  </div>
+      <header class="clock panel" aria-label="Date, time, and weather">
+        <div class="clock-display">
+          <div class="clock-overview">
+            <time id="clock-time">
+              <span class="visually-hidden" id="clock-readable"></span>
+              <canvas id="clock-digits" height="5" aria-hidden="true"></canvas>
+              <span id="clock-period" aria-hidden="true"></span>
+            </time>
+            <time id="clock-date"></time>
+            <div class="weather-group">
+              <div class="weather-reading">
+                <p id="weather-summary" role="status">Weather</p>
+                <div class="weather-city-row">
+                  <p id="weather-city" hidden></p>
+                  <button class="secondary" id="weather-edit" type="button"
+                    aria-haspopup="dialog" aria-controls="weather-dialog">
+                    <span id="weather-edit-label">Add city</span>
+                    <span id="weather-pencil" aria-hidden="true" hidden>✎</span>
+                  </button>
                 </div>
               </div>
               <div class="weather-visual" hidden>
-                <pre id="weather-icon" aria-hidden="true"></pre>
+                <canvas id="weather-icon" width="16" height="16" aria-hidden="true"></canvas>
                 <a id="weather-source" href="https://open-meteo.com/" target="_blank"
-                  rel="noopener noreferrer" aria-label="Weather by Open-Meteo">Open-Meteo</a>
+                rel="noopener noreferrer" aria-label="Weather by Open-Meteo">Open-Meteo</a>
               </div>
             </div>
-            <form id="weather-form" hidden>
+          </div>
+          <dialog class="action-dialog" id="weather-dialog" aria-labelledby="weather-dialog-title">
+            <h3 id="weather-dialog-title"></h3>
+            <form id="weather-form">
               <div class="weather-search">
                 <label class="visually-hidden" for="weather-query">City</label>
                 <input id="weather-query" type="text" placeholder="City or city, region"
@@ -49,79 +54,74 @@
               <p id="weather-feedback" role="status"></p>
               <ul id="weather-results" aria-label="Matching cities" hidden></ul>
             </form>
+          </dialog>
+        </div>
+      </header>
+      <aside class="workspace panel" aria-label="Tasks"></aside>
+      <section class="scratchpad panel" aria-labelledby="scratchpad-heading">
+        <header class="panel-bar">
+          <h2 id="scratchpad-heading">Scratchpad</h2>
+          <div class="scratchpad-header-actions">
+            <button class="secondary" id="scratchpad-toggle" type="button" aria-pressed="false"
+              aria-controls="scratchpad-note scratchpad-preview" disabled>Preview</button>
           </div>
         </header>
-        <aside class="workspace panel" aria-label="Tasks"></aside>
-      </div>
-      <div class="dashboard-content">
-        <section class="scratchpad panel" aria-labelledby="scratchpad-heading">
-          <header class="panel-bar">
-            <h2 id="scratchpad-heading">Scratchpad</h2>
-            <div class="scratchpad-header-actions">
-              <button class="danger-action" id="scratchpad-clear" type="button" disabled>Clear all tabs</button>
-              <button class="secondary" id="scratchpad-toggle" type="button" aria-pressed="false"
-                aria-controls="scratchpad-note scratchpad-preview" disabled>Preview</button>
-            </div>
-          </header>
-          <div class="scratchpad-body">
-            <div class="scratchpad-toolbar">
-              <div class="scratchpad-tabs" id="scratchpad-tabs" role="tablist" aria-label="Notes"></div>
-              <button class="secondary" id="scratchpad-add" type="button" aria-label="New note" title="New note" disabled>+</button>
-              <button class="secondary" id="scratchpad-options" type="button" aria-label="Note options"
-                title="Note options" aria-expanded="false" aria-controls="scratchpad-actions" disabled>⋯</button>
-            </div>
-            <div class="scratchpad-actions" id="scratchpad-actions" hidden>
-              <button class="secondary" id="scratchpad-rename" type="button">Rename note</button>
-              <button class="danger-action" id="scratchpad-delete" type="button">Delete note</button>
-            </div>
-            <div id="scratchpad-panel" role="tabpanel" aria-label="Selected note">
-              <textarea id="scratchpad-note" rows="6" aria-label="Note text"
-                placeholder="Write a quick note…" disabled></textarea>
-              <div class="scratchpad-preview" id="scratchpad-preview" role="region" aria-label="Note preview"
-                tabindex="0" hidden></div>
-            </div>
-            <div class="scratchpad-feedback">
-              <p id="scratchpad-error" class="error" role="alert"></p>
-              <button class="secondary" id="scratchpad-retry" type="button" hidden>Retry</button>
-            </div>
+        <div class="scratchpad-body">
+          <div class="scratchpad-toolbar">
+            <div class="scratchpad-tabs" id="scratchpad-tabs" role="tablist" aria-label="Notes"></div>
+            <button class="secondary" id="scratchpad-add" type="button" aria-label="New note" title="New note" disabled>+</button>
+            <button class="secondary" id="scratchpad-options" type="button" aria-label="Scratchpad options"
+              title="Scratchpad options" popovertarget="item-menu" aria-haspopup="menu" aria-expanded="false" disabled>⋯</button>
           </div>
-          <dialog class="scratchpad-dialog panel" id="scratchpad-dialog" aria-labelledby="scratchpad-dialog-title">
-            <h3 id="scratchpad-dialog-title"></h3>
-            <form id="scratchpad-form">
-              <label for="scratchpad-name" id="scratchpad-name-label">Name</label>
-              <input id="scratchpad-name" type="text" required>
-              <p id="scratchpad-confirm"></p>
-              <p id="scratchpad-dialog-error" class="error" role="alert"></p>
-              <div class="scratchpad-dialog-actions">
-                <button class="secondary" id="scratchpad-cancel" type="button">Cancel</button>
-                <button id="scratchpad-confirm-action" type="submit"></button>
-              </div>
-            </form>
-          </dialog>
-        </section>
-        <section class="pins panel" aria-labelledby="pins-heading">
-          <header class="pins-header panel-bar">
-            <h1 id="pins-heading">Pinned sites</h1>
-            <div class="pin-actions">
-              <button class="secondary" id="manage-pins" type="button" aria-controls="pin-list" hidden>Manage pins</button>
-              <button class="primary" id="add-pin" type="button" disabled>Add pin</button>
+          <div id="scratchpad-panel" role="tabpanel" aria-label="Selected note">
+            <textarea id="scratchpad-note" rows="6" aria-label="Note text"
+              placeholder="Write a quick note…" disabled></textarea>
+            <div class="scratchpad-preview" id="scratchpad-preview" role="region" aria-label="Note preview"
+              tabindex="0" hidden></div>
+          </div>
+          <div class="scratchpad-feedback">
+            <p id="scratchpad-error" class="error" role="alert"></p>
+            <button class="secondary" id="scratchpad-retry" type="button" hidden>Retry</button>
+          </div>
+        </div>
+        <dialog class="action-dialog panel" id="scratchpad-dialog" aria-labelledby="scratchpad-dialog-title">
+          <h3 id="scratchpad-dialog-title"></h3>
+          <form id="scratchpad-form">
+            <label id="scratchpad-name" hidden>Note name <input required></label>
+            <p id="scratchpad-confirm"></p>
+            <p id="scratchpad-dialog-error" class="error" role="alert"></p>
+            <div class="dialog-actions">
+              <button class="secondary" id="scratchpad-cancel" type="button">Cancel</button>
+              <button id="scratchpad-confirm-action" type="submit"></button>
             </div>
-          </header>
-          <div class="pins-body">
-            <form class="pin-form" id="pin-form" hidden>
+          </form>
+        </dialog>
+      </section>
+      <section class="pins panel" aria-labelledby="pins-heading">
+        <header class="pins-header panel-bar">
+          <h1 id="pins-heading">Pinned sites</h1>
+          <div class="pin-actions">
+            <button class="primary" id="add-pin" aria-haspopup="dialog" aria-controls="pin-dialog" type="button" disabled>Add pin</button>
+          </div>
+        </header>
+        <div class="pins-body">
+          <dialog class="action-dialog" id="pin-dialog" aria-labelledby="pin-dialog-title">
+            <h3 id="pin-dialog-title"></h3>
+            <form class="pin-form" id="pin-form">
               <label>URL <input name="url" type="text" inputmode="url" placeholder="example.com" required></label>
               <label>Label <input name="label" type="text" placeholder="Optional"></label>
-              <div class="pin-actions">
+              <p class="error" id="pin-dialog-error" role="alert" hidden></p>
+              <div class="dialog-actions">
                 <button class="primary" type="submit">Save pin</button>
                 <button class="secondary" id="cancel-pin" type="button">Cancel</button>
               </div>
             </form>
-            <p class="error" id="pin-error" role="alert" hidden></p>
-            <p class="empty" id="pin-empty">Loading pins…</p>
-            <ul class="pin-list" id="pin-list" hidden></ul>
-          </div>
-        </section>
-      </div>
+          </dialog>
+          <p class="error" id="pin-error" role="alert" hidden></p>
+          <p class="empty" id="pin-empty">Loading pins…</p>
+          <ul class="pin-list" id="pin-list" hidden></ul>
+        </div>
+      </section>
     </main>
   </body>
 </html>

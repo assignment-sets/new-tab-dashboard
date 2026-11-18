@@ -1,18 +1,57 @@
-import { normalizePin } from './pins.js';
+import { attachActions } from './item-actions.js';
+import { normalizePin, PinValidationError } from './pins.js';
 
 const date = document.querySelector('#clock-date');
 const time = document.querySelector('#clock-time');
 const dateFormat = new Intl.DateTimeFormat(undefined, {
-  weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+  weekday: 'long', month: 'long', day: 'numeric',
 });
-const timeFormat = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+const readable = document.querySelector('#clock-readable');
+const digits = document.querySelector('#clock-digits');
+const period = document.querySelector('#clock-period');
+const glyphs = {
+  0: ['111', '101', '101', '101', '111'],
+  1: ['010', '110', '010', '010', '111'],
+  2: ['111', '001', '111', '100', '111'],
+  3: ['111', '001', '111', '001', '111'],
+  4: ['101', '101', '111', '001', '001'],
+  5: ['111', '100', '111', '001', '111'],
+  6: ['111', '100', '111', '101', '111'],
+  7: ['111', '001', '010', '010', '010'],
+  8: ['111', '101', '111', '101', '111'],
+  9: ['111', '101', '111', '001', '111'],
+  ':': ['0', '1', '0', '1', '0'],
+};
+
+function drawDigits(value) {
+  digits.width = value.length * 4 - 3; // The colon is one pixel wide; omit the trailing space.
+  const context = digits.getContext('2d');
+  context.fillStyle = getComputedStyle(time).color;
+  let left = 0;
+  for (const character of value) {
+    const rows = glyphs[character];
+    rows.forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) {
+        if (row[x] === '1') context.fillRect(left + x, y, 1, 1);
+      }
+    });
+    left += rows[0].length + 1;
+  }
+}
 
 function updateClock() {
   const now = new Date();
   const formattedDate = dateFormat.format(now);
-  const formattedTime = timeFormat.format(now);
+  const hours = now.getHours();
+  const value = (hours % 12 || 12) + ':' + String(now.getMinutes()).padStart(2, '0');
+  const dayPeriod = hours < 12 ? 'AM' : 'PM';
+  const formattedTime = value + ' ' + dayPeriod;
   if (date.textContent !== formattedDate) date.textContent = formattedDate;
-  if (time.textContent !== formattedTime) time.textContent = formattedTime;
+  if (readable.textContent !== formattedTime) {
+    drawDigits(value);
+    period.textContent = dayPeriod;
+    readable.textContent = formattedTime;
+  }
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   date.dateTime = `${now.getFullYear()}-${month}-${day}`;
@@ -26,8 +65,9 @@ document.addEventListener('visibilitychange', () => {
 });
 
 const add = document.querySelector('#add-pin');
-const manage = document.querySelector('#manage-pins');
 const form = document.querySelector('#pin-form');
+const dialog = form.closest('dialog');
+const dialogError = document.querySelector('#pin-dialog-error');
 const url = form.elements.namedItem('url');
 const label = form.elements.namedItem('label');
 const submit = form.querySelector('[type="submit"]');
@@ -37,14 +77,16 @@ const empty = document.querySelector('#pin-empty');
 const error = document.querySelector('#pin-error');
 
 let pins = [];
-let managing = false;
+let draggedId;
+let destination;
 let editingId = null;
 let saving = false;
 let refreshVersion = 0;
 
 function showError(message) {
-  error.textContent = message;
-  error.hidden = !message;
+  const target = dialog.open ? dialogError : error;
+  target.textContent = message;
+  target.hidden = !message;
 }
 
 function openForm(pin = null) {
@@ -53,18 +95,20 @@ function openForm(pin = null) {
   url.value = pin?.url ?? '';
   label.value = pin?.label ?? '';
   submit.textContent = pin ? 'Save changes' : 'Save pin';
-  form.hidden = false;
+  document.querySelector('#pin-dialog-title').textContent = pin ? 'Edit pin' : 'Add pin';
+  dialog.showModal();
   showError('');
   url.focus();
 }
 
-function closeForm(id = editingId) {
-  form.hidden = true;
+dialog.addEventListener('cancel', event => {
+  if (saving) event.preventDefault();
+});
+dialog.addEventListener('close', () => {
+  const link = [...list.querySelectorAll('.pin-link')].find(link => link.dataset.pinId === editingId);
+  if (document.activeElement === document.body || !link) (link ?? add).focus({ preventScroll: true });
   editingId = null;
-  const same = [...list.querySelectorAll('[data-control="edit"]')]
-    .find(control => control.dataset.pinId === id);
-  (same ?? add).focus();
-}
+});
 
 async function save(action) {
   if (saving) return false;
@@ -83,19 +127,6 @@ async function save(action) {
   }
 }
 
-function makePinControl(pin, control, text, onClick, disabled = false) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'secondary';
-  button.textContent = text;
-  button.dataset.pinId = pin.id;
-  button.dataset.control = control;
-  button.setAttribute('aria-label', `${text} ${pin.label}`);
-  button.disabled = disabled;
-  button.addEventListener('click', onClick);
-  return button;
-}
-
 function renderPin(pin, index) {
   const row = document.createElement('li');
   const link = document.createElement('a');
@@ -104,7 +135,7 @@ function renderPin(pin, index) {
   link.className = 'pin-link';
   link.href = pin.url;
   link.referrerPolicy = 'no-referrer';
-  link.title = pin.url;
+  link.title = pin.label + '\n' + pin.url;
   link.dataset.pinId = pin.id;
   link.dataset.control = 'link';
   mark.className = 'pin-mark';
@@ -124,42 +155,40 @@ function renderPin(pin, index) {
   link.append(mark, title);
   row.append(link);
 
-  if (managing) {
-    const controls = document.createElement('div');
-    controls.className = 'pin-controls';
-    controls.append(
-      makePinControl(pin, 'edit', 'Edit', () => openForm(pin)),
-      makePinControl(pin, 'earlier', 'Move earlier', () => save({ type: 'move', id: pin.id, direction: -1 }), index === 0),
-      makePinControl(pin, 'later', 'Move later', () => save({ type: 'move', id: pin.id, direction: 1 }), index === pins.length - 1),
-      makePinControl(pin, 'remove', 'Remove', async () => {
-        if (await save({ type: 'remove', id: pin.id }) && editingId === pin.id) closeForm();
-      }),
-    );
-    row.append(controls);
-  }
+  attachActions(row, link, pin.label, [
+    { label: 'Edit', run: () => openForm(pin) },
+    { label: 'Remove', run: async () => {
+      await save({ type: 'remove', id: pin.id });
+    } },
+    { label: 'Move earlier', disabled: index === 0, run: () => save({ type: 'move', id: pin.id, direction: -1 }) },
+    { label: 'Move later', disabled: index === pins.length - 1, run: () => save({ type: 'move', id: pin.id, direction: 1 }) },
+  ]);
+  icon.draggable = false;
+  link.addEventListener('dragstart', event => {
+    draggedId = pin.id;
+    event.dataTransfer.clearData();
+    event.dataTransfer.setData('application/x-tab-tasks-pin', pin.id);
+    event.dataTransfer.effectAllowed = 'move';
+  });
   return row;
 }
 
 function render() {
   const { pinId, control } = document.activeElement.dataset;
   const hasPins = pins.length > 0;
-  if (!hasPins) managing = false;
-  manage.hidden = !hasPins;
-  manage.textContent = managing ? 'Done' : 'Manage pins';
-  list.classList.toggle('managing', managing);
   list.hidden = !hasPins;
   empty.hidden = hasPins;
   empty.textContent = 'Add a site you visit often.';
   const rows = document.createDocumentFragment();
   for (const [index, pin] of pins.entries()) rows.append(renderPin(pin, index));
+  clearMarker();
   list.replaceChildren(rows);
 
   if (pinId) {
     const controls = [...list.querySelectorAll('[data-pin-id]')]
       .filter(element => element.dataset.pinId === pinId && !element.disabled);
     const match = controls.find(element => element.dataset.control === control);
-    const edit = controls.find(element => element.dataset.control === 'edit');
-    (match ?? edit ?? (hasPins ? manage : add)).focus();
+    (match ?? add).focus({ preventScroll: true });
   }
 }
 
@@ -179,14 +208,70 @@ async function refresh() {
 }
 
 add.addEventListener('click', () => openForm());
-manage.addEventListener('click', () => {
-  managing = !managing;
-  render();
+function clearMarker() {
+  list.removeAttribute('data-drop');
+  destination = null;
+}
+
+function dropPosition(event) {
+  const rows = [...list.children];
+  // In gaps, choose the nearest row vertically, then the nearest tile horizontally.
+  let closest;
+  let vertical = Infinity;
+  let horizontal = Infinity;
+  for (const row of rows) {
+    const rect = row.getBoundingClientRect();
+    const dy = Math.max(rect.top - event.clientY, event.clientY - rect.bottom, 0);
+    const dx = Math.max(rect.left - event.clientX, event.clientX - rect.right, 0);
+    if (dy < vertical || (dy === vertical && dx < horizontal)) {
+      closest = row;
+      vertical = dy;
+      horizontal = dx;
+    }
+  }
+  if (!closest) return;
+  const rect = closest.getBoundingClientRect();
+  const gap = rows.indexOf(closest) + (event.clientX >= rect.left + rect.width / 2 ? 1 : 0);
+  const source = pins.findIndex(pin => pin.id === draggedId);
+  if (source < 0 || gap === source || gap === source + 1) return;
+  const after = gap === rows.length;
+  const index = after ? gap - 1 : gap;
+  const row = rows[index];
+  return { neighborId: pins[index].id, after, row };
+}
+
+list.addEventListener('dragover', event => {
+  if (!draggedId) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  const position = dropPosition(event);
+  if (!position) return clearMarker();
+  const { row, after, neighborId } = position;
+  destination = { neighborId, after };
+  const inset = row.offsetLeft === 0 || after ? 0 : parseFloat(getComputedStyle(list).columnGap) / 2;
+  list.style.setProperty('--drop-x', (row.offsetLeft + (after ? row.offsetWidth : -inset)) + 'px');
+  list.style.setProperty('--drop-y', row.offsetTop + 'px');
+  list.style.setProperty('--drop-height', row.offsetHeight + 'px');
+  list.setAttribute('data-drop', '');
+});
+list.addEventListener('dragleave', event => {
+  if (!list.contains(event.relatedTarget)) clearMarker();
+});
+list.addEventListener('drop', event => {
+  if (!draggedId) return;
+  event.preventDefault();
+  if (destination) void save({ type: 'place', id: draggedId, ...destination });
+  draggedId = null;
+  clearMarker();
+});
+document.addEventListener('dragend', () => {
+  draggedId = null;
+  clearMarker();
 });
 cancel.addEventListener('click', () => {
   if (saving) return;
   showError('');
-  closeForm();
+  dialog.close();
 });
 form.addEventListener('submit', async event => {
   event.preventDefault();
@@ -194,14 +279,14 @@ form.addEventListener('submit', async event => {
 
   let pin;
   try {
-    pin = normalizePin(url.value, label.value);
+    pin = normalizePin(url.value, label.value, pins.find(pin => pin.id === editingId)?.label);
   } catch (error) {
     showError(error.message);
-    url.focus();
+    (error instanceof PinValidationError ? label : url).focus();
     return;
   }
   const id = editingId;
-  if (await save({ type: id ? 'edit' : 'add', id, ...pin })) closeForm(id);
+  if (await save({ type: id ? 'edit' : 'add', id, url: pin.url, label: label.value })) dialog.close();
 });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.pins) void refresh();

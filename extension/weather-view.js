@@ -4,6 +4,7 @@ const edit = document.querySelector('#weather-edit');
 const editLabel = document.querySelector('#weather-edit-label');
 const pencil = document.querySelector('#weather-pencil');
 const form = document.querySelector('#weather-form');
+const dialog = form.closest('dialog');
 const query = document.querySelector('#weather-query');
 const cancel = document.querySelector('#weather-cancel');
 const results = document.querySelector('#weather-results');
@@ -28,19 +29,21 @@ function clearSearch() {
   feedback.textContent = '';
 }
 
-function toggleEditor(open) {
-  if (saving) return;
-  clearSearch();
-  form.hidden = !open;
-  edit.setAttribute('aria-expanded', String(open));
-  if (open) {
-    query.value = city?.name ?? '';
-    query.focus();
-    query.select();
-  } else {
-    edit.focus();
-  }
+function openEditor() {
+  document.querySelector('#weather-dialog-title').textContent = editLabel.textContent;
+  query.value = city?.name ?? '';
+  dialog.showModal();
+  query.focus();
+  query.select();
 }
+
+dialog.addEventListener('cancel', event => {
+  if (saving) event.preventDefault();
+});
+dialog.addEventListener('close', () => {
+  clearSearch();
+  edit.focus({ preventScroll: true });
+});
 
 async function saveCity(place) {
   if (saving) return;
@@ -55,7 +58,31 @@ async function saveCity(place) {
     query.disabled = false;
     saving = false;
   }
-  toggleEditor(false);
+  dialog.close();
+}
+
+function paintWeatherIcon(art) {
+  icon.hidden = !art;
+  if (!art) return;
+
+  const context = icon.getContext('2d');
+  const lines = art.split('\n');
+  const width = Math.max(...lines.map(line => line.length));
+  const left = Math.floor((icon.width - width) / 2);
+  const top = Math.floor((icon.height - lines.length * 2) / 2);
+  context.clearRect(0, 0, icon.width, icon.height);
+  context.fillStyle = getComputedStyle(icon).color;
+
+  // Each block character describes two square pixels stacked vertically.
+  lines.forEach((line, row) => {
+    for (let column = 0; column < line.length; column++) {
+      const block = line[column];
+      const x = left + column;
+      const y = top + row * 2;
+      if (block === '▀' || block === '█') context.fillRect(x, y, 1, 1);
+      if (block === '▄' || block === '█') context.fillRect(x, y + 1, 1, 1);
+    }
+  });
 }
 
 async function refreshWeather() {
@@ -66,8 +93,7 @@ async function refreshWeather() {
     const weather = await getCurrentWeather(city, { signal: controller.signal });
     if (controller.signal.aborted) return;
     summary.textContent = `${weather.temperature}°C · ${weather.condition}`;
-    icon.textContent = weather.icon;
-    icon.hidden = !weather.icon;
+    paintWeatherIcon(weather.icon);
     visual.hidden = false;
   } catch {
     if (controller.signal.aborted) return;
@@ -98,12 +124,9 @@ function showCity(place) {
   void refreshWeather();
 }
 
-edit.addEventListener('click', () => toggleEditor(form.hidden));
-cancel.addEventListener('click', () => toggleEditor(false));
+edit.addEventListener('click', openEditor);
+cancel.addEventListener('click', () => { if (!saving) dialog.close(); });
 query.addEventListener('input', clearSearch);
-form.addEventListener('keydown', event => {
-  if (event.key === 'Escape') toggleEditor(false);
-});
 form.addEventListener('submit', async event => {
   event.preventDefault();
   if (saving) return;

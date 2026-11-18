@@ -1,23 +1,21 @@
+import { attachActions, openMenu } from './item-actions.js';
 import { parseInline, parseNote } from './scratchpad-format.js';
 import { NOTE_TEXT_LIMIT, NOTE_TITLE_LIMIT, SCRATCHPAD_KEY } from './scratchpad-state.js';
 
 const note = document.querySelector('#scratchpad-note');
 const preview = document.querySelector('#scratchpad-preview');
 const toggle = document.querySelector('#scratchpad-toggle');
-const clear = document.querySelector('#scratchpad-clear');
 const error = document.querySelector('#scratchpad-error');
 const retry = document.querySelector('#scratchpad-retry');
 const tabs = document.querySelector('#scratchpad-tabs');
 const panel = document.querySelector('#scratchpad-panel');
 const add = document.querySelector('#scratchpad-add');
 const options = document.querySelector('#scratchpad-options');
-const actions = document.querySelector('#scratchpad-actions');
-const rename = document.querySelector('#scratchpad-rename');
-const remove = document.querySelector('#scratchpad-delete');
+const nameLabel = document.querySelector('#scratchpad-name');
+const nameInput = nameLabel.querySelector('input');
+nameInput.maxLength = NOTE_TITLE_LIMIT;
 const dialog = document.querySelector('#scratchpad-dialog');
 const form = document.querySelector('#scratchpad-form');
-const name = document.querySelector('#scratchpad-name');
-const nameLabel = document.querySelector('#scratchpad-name-label');
 const confirmation = document.querySelector('#scratchpad-confirm');
 const dialogError = document.querySelector('#scratchpad-dialog-error');
 const cancel = document.querySelector('#scratchpad-cancel');
@@ -34,7 +32,6 @@ let dialogAction;
 const drafts = new Map();
 
 note.maxLength = NOTE_TEXT_LIMIT;
-name.maxLength = NOTE_TITLE_LIMIT;
 
 function appendInline(parent, text) {
   for (const token of parseInline(text)) {
@@ -82,11 +79,6 @@ function renderFeedback() {
   retry.hidden = !loadFailed && !failed;
 }
 
-function showOptions(open) {
-  actions.hidden = !open;
-  options.setAttribute('aria-expanded', String(open));
-}
-
 function render() {
   const signature = JSON.stringify(workspace.notes.map(({ id, title }) => [id, title]));
   const rebuilt = signature !== tabSignature;
@@ -103,14 +95,22 @@ function render() {
       tab.title = title;
       tab.setAttribute('role', 'tab');
       tab.setAttribute('aria-controls', panel.id);
-      return tab;
+      const row = document.createElement('div');
+      row.setAttribute('role', 'presentation');
+      row.append(tab);
+      tab.ondblclick = () => openDialog('rename', id);
+      attachActions(row, tab, title, [
+        { label: 'Rename', run: () => openDialog('rename', id) },
+        { label: 'Delete', disabled: workspace.notes.length === 1, run: () => openDialog('delete', id) },
+      ]);
+      return row;
     }));
   }
 
   const switched = renderedId !== activeId;
   if (rebuilt || switched) {
     const selectedTab = document.getElementById('scratchpad-tab-' + activeId);
-    for (const tab of tabs.children) {
+    for (const tab of tabs.querySelectorAll('[role="tab"]')) {
       const selected = tab === selectedTab;
       tab.setAttribute('aria-selected', String(selected));
       tab.tabIndex = selected ? 0 : -1;
@@ -122,7 +122,6 @@ function render() {
   }
   if (switched) {
     renderedId = activeId;
-    showOptions(false);
   }
   const current = workspace.notes.find(item => item.id === activeId);
   const text = drafts.get(activeId)?.text ?? current.text;
@@ -139,9 +138,7 @@ function render() {
     }
     if (!preview.hidden) renderPreview();
   }
-  note.disabled = toggle.disabled = options.disabled = clear.disabled = false;
-  remove.disabled = workspace.notes.length === 1;
-  remove.title = remove.disabled ? 'Keep at least one note' : '';
+  note.disabled = toggle.disabled = options.disabled = false;
   renderFeedback();
 }
 
@@ -222,7 +219,7 @@ tabs.addEventListener('click', event => {
 tabs.addEventListener('keydown', event => {
   const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
   if (!keys.includes(event.key)) return;
-  const items = [...tabs.children];
+  const items = [...tabs.querySelectorAll('[role="tab"]')];
   const index = items.indexOf(event.target);
   if (index < 0) return;
   event.preventDefault();
@@ -251,57 +248,60 @@ add.addEventListener('click', async () => {
   }
 });
 
-options.addEventListener('click', () => showOptions(actions.hidden));
-actions.addEventListener('keydown', event => {
-  if (event.key !== 'Escape') return;
-  showOptions(false);
-  options.focus();
+options.addEventListener('click', event => {
+  openMenu(event, options, 'Scratchpad options', [
+    { label: 'Clear all tabs', className: 'danger-action', run: () => openDialog('clear') },
+  ]);
 });
 
-function openDialog(type) {
-  const current = workspace.notes.find(item => item.id === activeId);
-  const renaming = type === 'rename';
+function openDialog(type, id = activeId) {
+  const current = workspace.notes.find(item => item.id === id);
+  if (!current) return;
   const clearing = type === 'clear';
+  const renaming = type === 'rename';
+  nameLabel.hidden = nameInput.disabled = !renaming;
+  nameInput.value = current.title;
+  confirmation.hidden = renaming;
   dialogAction = { type, id: current.id };
   document.querySelector('#scratchpad-dialog-title').textContent = clearing ? 'Clear all tabs?'
     : renaming ? 'Rename note' : 'Delete note?';
-  nameLabel.hidden = name.hidden = name.disabled = !renaming;
-  name.value = current.title;
-  name.setCustomValidity('');
-  confirmation.hidden = renaming;
   confirmation.textContent = clearing ? 'All scratchpad notes will be deleted and replaced with one empty Notes tab.'
     : '“' + current.title + '” will be permanently deleted.';
-  confirmAction.textContent = clearing ? 'Clear all tabs' : renaming ? 'Save name' : 'Delete note';
+  confirmAction.textContent = clearing ? 'Clear all tabs' : renaming ? 'Save' : 'Delete note';
   confirmAction.className = renaming ? 'primary' : 'danger-action';
   dialogError.textContent = '';
-  showOptions(false);
   dialog.showModal();
-  if (renaming) name.select();
-  else cancel.focus();
+  if (renaming) {
+    nameInput.focus();
+    nameInput.select();
+  } else cancel.focus();
 }
 
-clear.addEventListener('click', () => openDialog('clear'));
-rename.addEventListener('click', () => openDialog('rename'));
-remove.addEventListener('click', () => openDialog('delete'));
 cancel.addEventListener('click', () => dialog.close());
 dialog.addEventListener('close', () => {
-  (dialogAction.type === 'clear' ? clear : options).focus({ preventScroll: true });
+  const target = dialogAction.type === 'clear' ? options
+    : document.getElementById('scratchpad-tab-' + dialogAction.id) ?? document.getElementById('scratchpad-tab-' + activeId);
+  if (!tabs.contains(document.activeElement) && document.activeElement !== options) {
+    target.focus({ preventScroll: true });
+  }
 });
 dialog.addEventListener('cancel', event => {
   if (confirmAction.disabled) event.preventDefault();
 });
-name.addEventListener('input', () => name.setCustomValidity(''));
 
 form.addEventListener('submit', async event => {
   event.preventDefault();
   if (confirmAction.disabled) return;
-  const action = { ...dialogAction, title: name.value.trim() };
-  if (action.type === 'rename' && !action.title) {
-    name.setCustomValidity('Enter a name for the note.');
-    name.reportValidity();
-    return;
+  const action = dialogAction;
+  if (action.type === 'rename') {
+    action.title = nameInput.value.trim();
+    if (!action.title) {
+      dialogError.textContent = 'Enter a name for the note.';
+      nameInput.focus();
+      return;
+    }
   }
-  confirmAction.disabled = cancel.disabled = true;
+  nameInput.readOnly = confirmAction.disabled = cancel.disabled = true;
   try {
     const next = await sendAction(action);
     if (action.type === 'delete') drafts.delete(action.id);
@@ -311,7 +311,7 @@ form.addEventListener('submit', async event => {
     dialogError.textContent = action.type === 'clear' ? 'Couldn’t clear the scratchpad.'
       : action.type === 'rename' ? 'Couldn’t rename this note.' : 'Couldn’t delete this note.';
   } finally {
-    confirmAction.disabled = cancel.disabled = false;
+    nameInput.readOnly = confirmAction.disabled = cancel.disabled = false;
   }
 });
 
