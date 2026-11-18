@@ -1,6 +1,6 @@
-# Tab Tasks
+# New Tab
 
-Open a regular Chrome tab to see your local date and time, pinned sites, and task sidebar. Use **Add pin** to save a URL and **Manage pins** to edit, reorder, or remove shortcuts. Tab Tasks tries each pinned site's standard favicon URL directly and shows an initial if the icon is unavailable.
+Open a regular Chrome tab to see your local date and time, pinned sites, and task sidebar. Use **Add pin** to save a URL and drag pins to reorder them. Right-click a pin to edit, move, or remove it. Tab Tasks tries each pinned site's standard favicon URL directly and shows an initial if the icon is unavailable.
 
 Use **Add city** in the clock panel to look up your city and see the current temperature in Celsius with a block-character weather icon. Click the pencil beside the city to change the saved location. Weather comes from [Open-Meteo](https://open-meteo.com/) and requires an internet connection.
 
@@ -8,7 +8,7 @@ Use the **Current** and **Completed** tabs to switch between unfinished tasks an
 
 Use **Clear all** in the Tasks header to delete both current and completed tasks after confirming.
 
-The **Scratchpad** on the New Tab page saves as you type. Use **Preview** to see headings, bullets, bold text, and inline code.
+The **Scratchpad** on the New Tab page saves as you type. Double-click a note tab to rename it, or right-click for note actions. Right-click a pinned site to edit, remove, or reorder it. Use Shift+F10 to open either context menu with the keyboard. Use **Preview** to see headings, bullets, bold text, and inline code.
 
 ## Install in Chrome
 

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Tab Tasks",
+  "name": "New Tab",
   "description": "Tasks, pinned sites, and a local clock on your New Tab page.",
   "version": "1.1.0",
   "permissions": ["storage"],
@@ -15,7 +15,7 @@
     "newtab": "new-tab.html"
   },
   "action": {
-    "default_title": "Tab Tasks",
+    "default_title": "New Tab",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/tasks-16.png",
