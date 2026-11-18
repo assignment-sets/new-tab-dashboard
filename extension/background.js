@@ -1,4 +1,4 @@
-import { changePins, DuplicatePinError } from './pins.js';
+import { changePins, PinValidationError } from './pins.js';
 import { createListWriter, createTaskWriter } from './task-writer.js';
 import { createScratchpadWriter } from './scratchpad-state.js';
 
@@ -23,7 +23,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   writer(action).then(
     () => sendResponse({ ok: true }),
-    error => sendResponse(error instanceof DuplicatePinError
+    error => sendResponse(error instanceof PinValidationError
       ? { ok: false, error: error.message }
       : { ok: false }),
   );

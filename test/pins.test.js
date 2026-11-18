@@ -72,3 +72,14 @@ test('allows renaming a pin even if its hostname was duplicated before the updat
   const result = changePins(pins, { type: 'edit', id: 'b', url: 'example.com', label: 'New name' });
   assert.deepEqual(result, [pins[0], { ...pins[1], label: 'New name' }]);
 });
+
+test('places pins relative to a stable neighbor in the latest list', () => {
+  const pins = ['a', 'b', 'new', 'c'].map(id => ({ id }));
+  function place(id, neighborId, after) {
+    return changePins(pins, { type: 'place', id, neighborId, after }).map(pin => pin.id);
+  }
+  assert.deepEqual(place('a', 'c', true), ['b', 'new', 'c', 'a']);
+  assert.deepEqual(place('c', 'b', false), ['a', 'c', 'b', 'new']);
+  assert.deepEqual(place('a', 'removed', false), ['a', 'b', 'new', 'c']);
+  assert.deepEqual(place('a', 'a', true), ['a', 'b', 'new', 'c']);
+});

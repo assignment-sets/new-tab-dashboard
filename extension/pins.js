@@ -1,4 +1,6 @@
-export function normalizePin(address, label) {
+export class PinValidationError extends Error {}
+
+export function normalizePin(address, label, previousLabel) {
   const input = address.trim();
   const hasWebScheme = /^https?:\/\//i.test(input);
   const bareHost = /^(?:localhost|[^/:?#\s]+\.[^/:?#\s]+|\[[a-f0-9:.]+\])(?::\d+)?(?:[/?#]|$)/i;
@@ -12,10 +14,14 @@ export function normalizePin(address, label) {
   if (url.username || url.password) {
     throw new Error(addressError);
   }
-  return { url: url.href, label: label.trim() || url.hostname };
+  const name = label.trim();
+  if (name !== previousLabel && Array.from(name).length > 32) {
+    throw new PinValidationError('Use 32 characters or fewer.');
+  }
+  return { url: url.href, label: name || url.hostname };
 }
 
-export class DuplicatePinError extends Error {
+export class DuplicatePinError extends PinValidationError {
   constructor() {
     super('This site is already pinned.');
   }
@@ -25,17 +31,17 @@ function pinHostname(url) {
   return new URL(url).hostname.replace(/\.$/, '');
 }
 
-function preparePin(pins, id, url, label, previousUrl) {
-  const pin = normalizePin(url, label);
+function preparePin(pins, id, url, label, previous) {
+  const pin = normalizePin(url, label, previous?.label);
   const hostname = pinHostname(pin.url);
-  if (previousUrl && pinHostname(previousUrl) === hostname) return { id, ...pin };
+  if (previous && pinHostname(previous.url) === hostname) return { id, ...pin };
   if (pins.some(existing => pinHostname(existing.url) === hostname)) {
     throw new DuplicatePinError();
   }
   return { id, ...pin };
 }
 
-export function changePins(pins, { type, id, url, label, direction }) {
+export function changePins(pins, { type, id, url, label, direction, neighborId, after }) {
   if (type === 'add') return [...pins, preparePin(pins, id, url, label)];
 
   const index = pins.findIndex(pin => pin.id === id);
@@ -46,9 +52,17 @@ export function changePins(pins, { type, id, url, label, direction }) {
 
   switch (type) {
     case 'edit':
-      return pins.with(index, preparePin(pins, id, url, label, pins[index].url));
+      return pins.with(index, preparePin(pins, id, url, label, pins[index]));
     case 'remove':
       return pins.toSpliced(index, 1);
+    case 'place': {
+      if (id === neighborId) return pins;
+      const rest = pins.toSpliced(index, 1);
+      const neighbor = rest.findIndex(pin => pin.id === neighborId);
+      if (neighbor < 0) return pins;
+      const target = neighbor + (after ? 1 : 0);
+      return target === index ? pins : rest.toSpliced(target, 0, pins[index]);
+    }
     case 'move': {
       if (direction !== -1 && direction !== 1) return pins;
       const target = index + direction;
