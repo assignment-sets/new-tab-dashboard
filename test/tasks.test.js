@@ -63,3 +63,34 @@ test('serializes overlapping writes and keeps accepting changes after a storage 
   await Promise.all([first, second]);
   assert.deepEqual(saved, [makeTask('first', 2), makeTask('second', 3)]);
 });
+
+test('edits active and completed titles without changing task order or completion', () => {
+  const tasks = [makeTask('a', 10), makeTask('b', 20, 30)];
+  const activeEdited = changeTasks(tasks, { type: 'edit', id: 'a', title: ' Active ' });
+  const bothEdited = changeTasks(activeEdited, { type: 'edit', id: 'b', title: 'Completed' });
+  assert.deepEqual(bothEdited, [
+    { ...tasks[0], title: 'Active' }, { ...tasks[1], title: 'Completed' },
+  ]);
+  for (const title of ['   ', 'a'.repeat(titleLimit + 1)]) {
+    assert.throws(() => changeTasks(tasks, { type: 'edit', id: 'a', title }));
+  }
+  assert.equal(changeTasks(tasks, { type: 'edit', id: 'a', title: 'a' }), tasks);
+  assert.throws(() => changeTasks(tasks, { type: 'edit', id: 'gone', title: 'New title' }));
+});
+
+test('deletes active or completed tasks and leaves other records intact', () => {
+  const active = makeTask('a', 10);
+  const completed = makeTask('b', 20, 30);
+  const tasks = [active, completed];
+  assert.deepEqual(changeTasks(tasks, { type: 'delete', id: 'a' }), [completed]);
+  assert.deepEqual(changeTasks(tasks, { type: 'delete', id: 'b' }), [active]);
+  assert.equal(changeTasks(tasks, { type: 'delete', id: 'gone' }), tasks);
+});
+
+test('clears current and completed tasks without modifying the original list', () => {
+  const tasks = [makeTask('active', 10), makeTask('completed', 20, 30)];
+  assert.deepEqual(changeTasks(tasks, { type: 'clear' }), []);
+  assert.equal(tasks.length, 2);
+  const empty = [];
+  assert.equal(changeTasks(empty, { type: 'clear' }), empty);
+});

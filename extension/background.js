@@ -1,16 +1,31 @@
-import { createTaskWriter } from './task-writer.js';
+import { changePins, DuplicatePinError } from './pins.js';
+import { createListWriter, createTaskWriter } from './task-writer.js';
+import { createScratchpadWriter } from './scratchpad-state.js';
 
 const writeTask = createTaskWriter(chrome.storage.local);
+const writePin = createListWriter(chrome.storage.local, 'pins', changePins);
+const writeScratchpad = createScratchpadWriter(chrome.storage.local);
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.kind !== 'task-action') return;
+  if (message?.kind === 'scratchpad-action') {
+    writeScratchpad(message.action).then(
+      workspace => sendResponse({ ok: true, workspace }),
+      () => sendResponse({ ok: false }),
+    );
+    return true;
+  }
+  const writer = message?.kind === 'task-action' ? writeTask
+    : message?.kind === 'pin-action' ? writePin : null;
+  if (!writer) return;
 
   const action = { ...message.action, at: Date.now() };
   if (action.type === 'add') action.id = crypto.randomUUID();
 
-  writeTask(action).then(
+  writer(action).then(
     () => sendResponse({ ok: true }),
-    () => sendResponse({ ok: false }),
+    error => sendResponse(error instanceof DuplicatePinError
+      ? { ok: false, error: error.message }
+      : { ok: false }),
   );
   return true;
 });

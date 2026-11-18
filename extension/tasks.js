@@ -1,14 +1,30 @@
 export const titleLimit = 240;
 export const previewSize = 3;
 
+function taskTitle(title) {
+  const trimmed = title.trim();
+  if (!trimmed || trimmed.length > titleLimit) {
+    throw new Error('Enter a task between 1 and 240 characters.');
+  }
+  return trimmed;
+}
+
 export function changeTasks(tasks, { type, id, title, at }) {
   switch (type) {
-    case 'add': {
-      const trimmedTitle = title.trim();
-      if (!trimmedTitle || trimmedTitle.length > titleLimit) {
-        throw new Error('Enter a task between 1 and 240 characters.');
-      }
-      return [...tasks, { id, title: trimmedTitle, createdAt: at, completedAt: null }];
+    case 'add':
+      return [...tasks, { id, title: taskTitle(title), createdAt: at, completedAt: null }];
+    case 'clear':
+      return tasks.length ? [] : tasks;
+    case 'edit': {
+      const index = tasks.findIndex(task => task.id === id);
+      if (index === -1) throw new Error('This task was deleted in another view.');
+      const trimmed = taskTitle(title);
+      const task = tasks[index];
+      return task.title === trimmed ? tasks : tasks.with(index, { ...task, title: trimmed });
+    }
+    case 'delete': {
+      const index = tasks.findIndex(task => task.id === id);
+      return index === -1 ? tasks : tasks.toSpliced(index, 1);
     }
     case 'complete':
     case 'restore': {
