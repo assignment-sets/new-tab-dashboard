@@ -35,12 +35,13 @@ test('adds, edits, reorders and removes pins without changing other entries', ()
   assert.throws(() => changePins(moved, { type: 'edit', id: 'missing', url: 'example.com', label: '' }));
 });
 
-test('rejects a second pin for the same hostname regardless of label or URL details', () => {
+test('rejects equivalent URLs regardless of label or trailing slash', () => {
   const pins = [{ id: 'a', url: 'https://example.com/', label: 'Example' }];
   for (const [url, label] of [
     ['https://example.com/', 'Example'],
     ['https://example.com/', 'Another name'],
-    ['http://EXAMPLE.com.:8080/docs?query=1#section', 'Docs'],
+    ['https://EXAMPLE.com:443', 'Another name'],
+    ['example.com', 'Example'],
   ]) {
     assert.throws(() => changePins(pins, { type: 'add', id: 'b', url, label }),
       { message: 'This site is already pinned.' });
@@ -55,16 +56,16 @@ test('allows separate pins for a domain and its subdomains', () => {
   ]);
 });
 
-test('rejects edits that move a pin to another pin’s hostname', () => {
+test('rejects edits that move a pin to another pin’s URL', () => {
   const pins = [
     { id: 'a', url: 'https://example.com/', label: 'Example' },
     { id: 'b', url: 'https://docs.example.com/', label: 'Docs' },
   ];
-  assert.throws(() => changePins(pins, { type: 'edit', id: 'b', url: 'example.com/page', label: '' }),
+  assert.throws(() => changePins(pins, { type: 'edit', id: 'b', url: 'example.com/', label: '' }),
     { message: 'This site is already pinned.' });
 });
 
-test('allows renaming a pin even if its hostname was duplicated before the update', () => {
+test('allows renaming a pin even if its URL was duplicated before the update', () => {
   const pins = [
     { id: 'a', url: 'https://example.com/', label: 'Example' },
     { id: 'b', url: 'https://example.com/', label: 'Example' },
@@ -82,4 +83,34 @@ test('places pins relative to a stable neighbor in the latest list', () => {
   assert.deepEqual(place('c', 'b', false), ['a', 'c', 'b', 'new']);
   assert.deepEqual(place('a', 'removed', false), ['a', 'b', 'new', 'c']);
   assert.deepEqual(place('a', 'a', true), ['a', 'b', 'new', 'c']);
+});
+
+test('allows distinct paths, queries, fragments, schemes and ports on the same host', () => {
+  const pins = [{ id: 'a', url: 'https://example.com/docs?x=1#intro', label: 'Docs' }];
+  for (const url of [
+    'https://example.com/other?x=1#intro',
+    'https://example.com/Docs?x=1#intro',
+    'https://example.com/docs?x=2#intro',
+    'https://example.com/docs?x=1#other',
+    'http://example.com/docs?x=1#intro',
+    'https://example.com:8080/docs?x=1#intro',
+  ]) {
+    assert.equal(changePins(pins, { type: 'add', id: 'b', url, label: '' }).length, 2);
+  }
+});
+
+test('ignores a trailing path slash when checking adds and edits for duplicates', () => {
+  const pins = [
+    { id: 'a', url: 'https://example.com/docs/?x=1#intro', label: 'Docs' },
+    { id: 'b', url: 'https://example.com/other', label: 'Other' },
+  ];
+  for (const type of ['add', 'edit']) {
+    assert.throws(() => changePins(pins, {
+      type, id: 'b', url: 'https://EXAMPLE.com:443/docs?x=1#intro', label: '',
+    }), { message: 'This site is already pinned.' });
+  }
+  const edited = changePins(pins, {
+    type: 'edit', id: 'b', url: 'https://example.com/new-page', label: '',
+  });
+  assert.equal(edited[1].url, 'https://example.com/new-page');
 });

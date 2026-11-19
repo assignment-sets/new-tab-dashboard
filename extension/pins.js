@@ -27,15 +27,17 @@ export class DuplicatePinError extends PinValidationError {
   }
 }
 
-function pinHostname(url) {
-  return new URL(url).hostname.replace(/\.$/, '');
+function pinUrlKey(address) {
+  const url = new URL(address);
+  url.pathname = url.pathname.replace(/\/$/, '');
+  return url.href;
 }
 
 function preparePin(pins, id, url, label, previous) {
   const pin = normalizePin(url, label, previous?.label);
-  const hostname = pinHostname(pin.url);
-  if (previous && pinHostname(previous.url) === hostname) return { id, ...pin };
-  if (pins.some(existing => pinHostname(existing.url) === hostname)) {
+  const key = pinUrlKey(pin.url);
+  if (previous && pinUrlKey(previous.url) === key) return { id, ...pin };
+  if (pins.some(existing => pinUrlKey(existing.url) === key)) {
     throw new DuplicatePinError();
   }
   return { id, ...pin };
