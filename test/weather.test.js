@@ -41,16 +41,26 @@ test('current weather uses the chosen coordinates and draws a crescent for a cle
   })).icon);
 });
 
-test('weather conditions have distinct block-character silhouettes', async () => {
+test('weather conditions have distinct block-character silhouettes and multi-frame animations', async () => {
   const city = { latitude: 48.85, longitude: 2.35 };
-  const icons = await Promise.all([0, 2, 3, 45, 51, 61, 71, 95].map(async weather_code => {
-    const fetcher = async () => Response.json({ current: { temperature_2m: 12, weather_code, is_day: 1 } });
-    return (await getCurrentWeather(city, { fetcher })).icon;
+  const results = await Promise.all([
+    [0, 1], [0, 0], [2, 1], [3, 1], [45, 1], [51, 1], [61, 1], [71, 1], [95, 1],
+  ].map(async ([weather_code, is_day]) => {
+    const fetcher = async () => Response.json({ current: { temperature_2m: 12, weather_code, is_day } });
+    return getCurrentWeather(city, { fetcher });
   }));
+  const icons = results.map(result => result.icon);
   assert.equal(new Set(icons).size, icons.length);
-  for (const icon of icons) {
-    assert.match(icon, /^[ ▀▄█\n]+$/u);
-    assert.ok(icon.includes('█'));
+  for (const { icon, frames } of results) {
+    assert.equal(icon, frames[0]);
+    assert.ok(frames.length >= 2);
+    assert.ok(new Set(frames).size >= 2);
+    const shape = frames[0].split('\n').map(line => line.length).join(',');
+    for (const frame of frames) {
+      assert.match(frame, /^[ ▀▄█\n]+$/u);
+      assert.ok(frame.includes('█'));
+      assert.equal(frame.split('\n').map(line => line.length).join(','), shape);
+    }
   }
 });
 

@@ -16,28 +16,51 @@
       <header class="clock panel" aria-label="Date, time, and weather">
         <div class="clock-display">
           <div class="clock-overview">
-            <time id="clock-time">
-              <span class="visually-hidden" id="clock-readable"></span>
-              <canvas id="clock-digits" height="5" aria-hidden="true"></canvas>
-              <span id="clock-period" aria-hidden="true"></span>
-            </time>
-            <time id="clock-date"></time>
-            <div class="weather-group">
-              <div class="weather-reading">
-                <p id="weather-summary" role="status">Weather</p>
-                <div class="weather-city-row">
-                  <p id="weather-city" hidden></p>
-                  <button class="secondary" id="weather-edit" type="button"
-                    aria-haspopup="dialog" aria-controls="weather-dialog">
-                    <span id="weather-edit-label">Add city</span>
-                    <span id="weather-pencil" aria-hidden="true" hidden>✎</span>
-                  </button>
-                </div>
+            <div class="clock-block">
+              <div class="clock-time-row">
+                <time id="clock-time">
+                  <span class="visually-hidden" id="clock-readable"></span>
+                  <canvas id="clock-digits" height="5" aria-hidden="true"></canvas>
+                  <span id="clock-period" aria-hidden="true"></span>
+                </time>
+                <span id="network-status" class="network-status" role="status" aria-live="polite" hidden>Offline</span>
               </div>
-              <div class="weather-visual" hidden>
-                <canvas id="weather-icon" width="16" height="16" aria-hidden="true"></canvas>
-                <a id="weather-source" href="https://open-meteo.com/" target="_blank"
-                rel="noopener noreferrer" aria-label="Weather by Open-Meteo">Open-Meteo</a>
+              <div class="year-row" id="year-row">
+                <span id="clock-year"></span>
+                <canvas id="year-months" height="2" aria-hidden="true"></canvas>
+                <span id="year-percent"></span>
+                <span id="clock-week"></span>
+              </div>
+            </div>
+            <div class="clock-calendar">
+              <p class="calendar-line">
+                <span id="clock-day-period"></span>
+                <time id="clock-date"></time>
+              </p>
+              <div class="week-days" aria-hidden="true">
+                <span title="Monday">M</span>
+                <span title="Tuesday">T</span>
+                <span title="Wednesday">W</span>
+                <span title="Thursday">T</span>
+                <span title="Friday">F</span>
+                <span title="Saturday">S</span>
+                <span title="Sunday">S</span>
+              </div>
+            </div>
+            <div class="weather-group">
+              <span id="weather-summary" class="visually-hidden" role="status">Weather</span>
+              <div class="weather-now">
+                <span id="weather-warning" role="img" tabindex="0" hidden>⚠</span>
+                <canvas id="weather-icon" width="16" height="16" aria-hidden="true" hidden></canvas>
+                <canvas id="weather-temperature" height="5" aria-hidden="true" hidden></canvas>
+                <span id="weather-unit" aria-hidden="true" hidden>°C</span>
+              </div>
+              <div class="weather-meta">
+                <button class="secondary" id="weather-edit" type="button"
+                  aria-haspopup="dialog" aria-controls="weather-dialog">Add city</button>
+                <span id="weather-condition" aria-hidden="true" hidden></span>
+                <button id="weather-city" type="button"
+                  aria-haspopup="dialog" aria-controls="weather-dialog" hidden></button>
               </div>
             </div>
           </div>
@@ -53,6 +76,8 @@
               </div>
               <p id="weather-feedback" role="status"></p>
               <ul id="weather-results" aria-label="Matching cities" hidden></ul>
+              <p class="weather-credit">Weather data by <a href="https://open-meteo.com/" target="_blank"
+                rel="noopener noreferrer">Open-Meteo</a></p>
             </form>
           </dialog>
         </div>

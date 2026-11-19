@@ -1,8 +1,7 @@
 import { getCurrentWeather, searchCities } from './weather.js';
+import { drawPixelText } from './pixel-text.js';
 
 const edit = document.querySelector('#weather-edit');
-const editLabel = document.querySelector('#weather-edit-label');
-const pencil = document.querySelector('#weather-pencil');
 const form = document.querySelector('#weather-form');
 const dialog = form.closest('dialog');
 const query = document.querySelector('#weather-query');
@@ -10,16 +9,24 @@ const cancel = document.querySelector('#weather-cancel');
 const results = document.querySelector('#weather-results');
 const feedback = document.querySelector('#weather-feedback');
 const summary = document.querySelector('#weather-summary');
+const warning = document.querySelector('#weather-warning');
 const cityLabel = document.querySelector('#weather-city');
 const icon = document.querySelector('#weather-icon');
-const visual = document.querySelector('.weather-visual');
+const temperature = document.querySelector('#weather-temperature');
+const unit = document.querySelector('#weather-unit');
+const condition = document.querySelector('#weather-condition');
 const refreshInterval = 15 * 60 * 1000;
 
 let city;
+let displayedWeather;
 let search;
 let request;
 let refreshAt = 0;
 let saving = false;
+let iconTimer;
+let iconFrame = 0;
+const frameInterval = 750;
+const reducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
 
 function clearSearch() {
   search?.abort();
@@ -30,7 +37,7 @@ function clearSearch() {
 }
 
 function openEditor() {
-  document.querySelector('#weather-dialog-title').textContent = editLabel.textContent;
+  document.querySelector('#weather-dialog-title').textContent = city ? 'Edit city' : 'Add city';
   query.value = city?.name ?? '';
   dialog.showModal();
   query.focus();
@@ -42,7 +49,7 @@ dialog.addEventListener('cancel', event => {
 });
 dialog.addEventListener('close', () => {
   clearSearch();
-  edit.focus({ preventScroll: true });
+  (city ? cityLabel : edit).focus({ preventScroll: true });
 });
 
 async function saveCity(place) {
@@ -85,6 +92,57 @@ function paintWeatherIcon(art) {
   });
 }
 
+function stopIconAnimation() {
+  if (iconTimer !== undefined) {
+    clearInterval(iconTimer);
+    iconTimer = undefined;
+  }
+}
+
+function syncIconAnimation() {
+  stopIconAnimation();
+  const frames = displayedWeather?.frames?.length
+    ? displayedWeather.frames
+    : (displayedWeather?.icon ? [displayedWeather.icon] : []);
+  if (!frames.length) {
+    paintWeatherIcon('');
+    return;
+  }
+  iconFrame %= frames.length;
+  paintWeatherIcon(frames[iconFrame]);
+  if (frames.length < 2 || document.hidden || reducedMotion?.matches) return;
+  iconTimer = setInterval(() => {
+    iconFrame = (iconFrame + 1) % frames.length;
+    paintWeatherIcon(frames[iconFrame]);
+  }, frameInterval);
+}
+
+reducedMotion?.addEventListener?.('change', syncIconAnimation);
+
+function displayWeather(weather) {
+  displayedWeather = weather;
+  iconFrame = 0;
+  const reading = weather ? `${weather.temperature}°C` : '—°C';
+  temperature.hidden = unit.hidden = !city;
+  if (city) drawPixelText(temperature, weather ? String(weather.temperature) : '--', getComputedStyle(temperature).color);
+  condition.textContent = weather?.condition ?? (city ? '—' : '');
+  condition.hidden = !condition.textContent;
+  summary.textContent = city ? `${reading} · ${condition.textContent}` : 'Weather';
+  syncIconAnimation();
+}
+
+function cacheKey(place) {
+  return `weather:${place.latitude},${place.longitude}`;
+}
+
+function readWeather(place) {
+  try {
+    return JSON.parse(localStorage.getItem(cacheKey(place)));
+  } catch {
+    return null;
+  }
+}
+
 async function refreshWeather() {
   if (!city || request || Date.now() < refreshAt) return;
   const controller = new AbortController();
@@ -92,13 +150,18 @@ async function refreshWeather() {
   try {
     const weather = await getCurrentWeather(city, { signal: controller.signal });
     if (controller.signal.aborted) return;
-    summary.textContent = `${weather.temperature}°C · ${weather.condition}`;
-    paintWeatherIcon(weather.icon);
-    visual.hidden = false;
+    displayWeather(weather);
+    warning.hidden = true;
+    try {
+      localStorage.setItem(cacheKey(city), JSON.stringify(weather));
+    } catch {
+      // Weather is still available in this tab if storage is unavailable.
+    }
   } catch {
     if (controller.signal.aborted) return;
-    summary.textContent = 'Weather unavailable';
-    visual.hidden = true;
+    warning.title = displayedWeather ? 'Couldn’t refresh. Showing cached weather.' : 'Couldn’t fetch weather.';
+    warning.setAttribute('aria-label', warning.title);
+    warning.hidden = false;
   } finally {
     if (request === controller) {
       request = undefined;
@@ -112,19 +175,18 @@ function showCity(place) {
   request = undefined;
   refreshAt = 0;
   city = place;
-  editLabel.textContent = city ? 'Edit city' : 'Add city';
-  editLabel.classList.toggle('visually-hidden', Boolean(city));
-  edit.classList.toggle('icon-only', Boolean(city));
-  edit.title = editLabel.textContent;
-  pencil.hidden = !city;
-  summary.textContent = city ? 'Loading weather…' : 'Weather';
+  edit.hidden = Boolean(city);
+  displayWeather(city ? readWeather(city) : null);
+  warning.hidden = true;
   cityLabel.textContent = city?.label ?? '';
+  cityLabel.title = city ? `${city.label} — Edit city` : '';
+  cityLabel.setAttribute('aria-label', city ? `${city.label}, edit city` : '');
   cityLabel.hidden = !city;
-  visual.hidden = true;
   void refreshWeather();
 }
 
 edit.addEventListener('click', openEditor);
+cityLabel.addEventListener('click', openEditor);
 cancel.addEventListener('click', () => { if (!saving) dialog.close(); });
 query.addEventListener('input', clearSearch);
 form.addEventListener('submit', async event => {
@@ -178,10 +240,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
 chrome.storage.local.get('weatherCity').then(({ weatherCity }) => {
   if (!cityChanged && weatherCity) showCity(weatherCity);
 }).catch(() => {
-  if (!cityChanged) summary.textContent = 'Couldn’t load the saved city';
+  if (!cityChanged) {
+    condition.textContent = 'Couldn’t load the saved city';
+    condition.hidden = false;
+    summary.textContent = condition.textContent;
+  }
 });
 
 function refreshWhenVisible() {
+  syncIconAnimation();
   if (!document.hidden) void refreshWeather();
 }
 
