@@ -1,3 +1,4 @@
+import { runReminders } from './reminder-service.js';
 import { changePins, PinValidationError } from './pins.js';
 import { createListWriter, createTaskWriter } from './task-writer.js';
 import { createScratchpadWriter } from './scratchpad-state.js';
@@ -15,6 +16,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   const writer = message?.kind === 'task-action' ? writeTask
+    : message?.kind === 'reminder-action' ? runReminders
     : message?.kind === 'pin-action' ? writePin : null;
   if (!writer) return;
 

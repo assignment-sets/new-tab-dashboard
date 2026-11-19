@@ -3,7 +3,8 @@
   "name": "New Tab",
   "description": "Tasks, pinned sites, and a local clock on your New Tab page.",
   "version": "1.1.0",
-  "permissions": ["storage"],
+  "permissions": ["storage", "alarms", "offscreen"],
+  "optional_permissions": ["notifications"],
   "host_permissions": ["https://api.open-meteo.com/*", "https://geocoding-api.open-meteo.com/*"],
   "icons": {
     "16": "icons/tasks-16.png",
