@@ -1,52 +1,80 @@
 import { attachActions } from './item-actions.js';
 import { normalizePin, PinValidationError } from './pins.js';
+import { dayPeriod as getDayPeriod } from './day-period.js';
+import { drawPixelText } from './pixel-text.js';
 
 const date = document.querySelector('#clock-date');
+const dayPeriodLabel = document.querySelector('#clock-day-period');
+const weekDays = document.querySelectorAll('.week-days > span');
 const time = document.querySelector('#clock-time');
+const yearLabel = document.querySelector('#clock-year');
+const yearRow = document.querySelector('#year-row');
+const yearMonths = document.querySelector('#year-months');
+const yearPercent = document.querySelector('#year-percent');
+const week = document.querySelector('#clock-week');
 const dateFormat = new Intl.DateTimeFormat(undefined, {
   weekday: 'long', month: 'long', day: 'numeric',
 });
 const readable = document.querySelector('#clock-readable');
 const digits = document.querySelector('#clock-digits');
 const period = document.querySelector('#clock-period');
-const glyphs = {
-  0: ['111', '101', '101', '101', '111'],
-  1: ['010', '110', '010', '010', '111'],
-  2: ['111', '001', '111', '100', '111'],
-  3: ['111', '001', '111', '001', '111'],
-  4: ['101', '101', '111', '001', '001'],
-  5: ['111', '100', '111', '001', '111'],
-  6: ['111', '100', '111', '101', '111'],
-  7: ['111', '001', '010', '010', '010'],
-  8: ['111', '101', '111', '101', '111'],
-  9: ['111', '101', '111', '001', '111'],
-  ':': ['0', '1', '0', '1', '0'],
-};
-
+const networkStatus = document.querySelector('#network-status');
 function drawDigits(value) {
-  digits.width = value.length * 4 - 3; // The colon is one pixel wide; omit the trailing space.
-  const context = digits.getContext('2d');
-  context.fillStyle = getComputedStyle(time).color;
-  let left = 0;
-  for (const character of value) {
-    const rows = glyphs[character];
-    rows.forEach((row, y) => {
-      for (let x = 0; x < row.length; x++) {
-        if (row[x] === '1') context.fillRect(left + x, y, 1, 1);
-      }
-    });
-    left += rows[0].length + 1;
+  drawPixelText(digits, value, getComputedStyle(time).color);
+}
+
+const dayLength = 24 * 60 * 60 * 1000;
+
+function isoWeek(day) {
+  // The ISO week belongs to the year that contains its Thursday.
+  const thursday = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 3 - (day.getDay() + 6) % 7);
+  const firstThursday = new Date(thursday.getFullYear(), 0, 4);
+  return 1 + Math.round(((thursday - firstThursday) / dayLength - 3 + (firstThursday.getDay() + 6) % 7) / 7);
+}
+
+// Twelve 4-pixel month blocks; the current month fills column by column.
+function drawYear(now) {
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const monthDays = new Date(year, month + 1, 0).getDate();
+  const dayOfYear = Math.round((new Date(year, month, now.getDate()) - new Date(year, 0, 1)) / dayLength) + 1;
+  const yearDays = Math.round((new Date(year + 1, 0, 1) - new Date(year, 0, 1)) / dayLength);
+  const filledColumns = month * 4 + Math.round(now.getDate() / monthDays * 4);
+  yearMonths.width = 12 * 5 - 1;
+  const context = yearMonths.getContext('2d');
+  context.fillStyle = getComputedStyle(yearMonths).color;
+  for (let column = 0; column < 48; column++) {
+    context.globalAlpha = column < filledColumns ? 1 : 0.28;
+    context.fillRect(column + Math.floor(column / 4), 0, 1, 2);
   }
+  const percent = Math.floor(dayOfYear / yearDays * 100);
+  yearPercent.textContent = `${percent}%`;
+  week.textContent = `W${isoWeek(now)}`;
+  yearRow.title = `Day ${dayOfYear} of ${yearDays} · ${percent}% of ${year} · ISO week ${isoWeek(now)}`;
 }
 
 function updateClock() {
   const now = new Date();
   const formattedDate = dateFormat.format(now);
   const hours = now.getHours();
+  const currentDayPeriod = getDayPeriod(now);
+  if (dayPeriodLabel.textContent !== currentDayPeriod) {
+    dayPeriodLabel.textContent = currentDayPeriod;
+  }
   const value = (hours % 12 || 12) + ':' + String(now.getMinutes()).padStart(2, '0');
   const dayPeriod = hours < 12 ? 'AM' : 'PM';
   const formattedTime = value + ' ' + dayPeriod;
-  if (date.textContent !== formattedDate) date.textContent = formattedDate;
+  if (date.textContent !== formattedDate) {
+    date.textContent = formattedDate;
+    const year = now.getFullYear();
+    yearLabel.textContent = year;
+    drawYear(now);
+    const mondayFirstIndex = (now.getDay() + 6) % 7;
+    weekDays.forEach((dot, index) => {
+      dot.classList.toggle('today', index === mondayFirstIndex);
+      dot.classList.toggle('past', index < mondayFirstIndex);
+    });
+  }
   if (readable.textContent !== formattedTime) {
     drawDigits(value);
     period.textContent = dayPeriod;
@@ -58,10 +86,22 @@ function updateClock() {
   time.dateTime = now.toTimeString().slice(0, 5);
 }
 
+function updateNetworkStatus() {
+  if (networkStatus) networkStatus.hidden = typeof navigator !== 'undefined' ? navigator.onLine : true;
+}
+
 updateClock();
+updateNetworkStatus();
 setInterval(updateClock, 1000);
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', updateNetworkStatus);
+  window.addEventListener('offline', updateNetworkStatus);
+}
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) updateClock();
+  if (!document.hidden) {
+    updateClock();
+    updateNetworkStatus();
+  }
 });
 
 const add = document.querySelector('#add-pin');
