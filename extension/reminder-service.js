@@ -31,7 +31,7 @@ async function deliver(items) {
         throw Error('Desktop notifications are unavailable');
       }
       await chrome.notifications.create(items[0].id, {
-        type: 'basic', title, message, iconUrl: 'icons/tasks-128.png', silent: true,
+        type: 'basic', title, message, iconUrl: 'icons/icon-128.png', silent: true,
       });
     } catch {
       // Each missed batch remains available until the user dismisses it.
