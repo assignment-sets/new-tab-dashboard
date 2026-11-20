@@ -1,6 +1,6 @@
 import { attachActions, openMenu } from './item-actions.js';
 import { parseInline, parseNote } from './scratchpad-format.js';
-import { NOTE_TEXT_LIMIT, NOTE_TITLE_LIMIT, SCRATCHPAD_KEY } from './scratchpad-state.js';
+import { createDraftSaver, NOTE_TEXT_LIMIT, NOTE_TITLE_LIMIT, SCRATCHPAD_KEY } from './scratchpad-state.js';
 
 const note = document.querySelector('#scratchpad-note');
 const preview = document.querySelector('#scratchpad-preview');
@@ -146,7 +146,7 @@ function applyWorkspace(next) {
   const priorIndex = workspace?.notes.findIndex(item => item.id === activeId) ?? -1;
   if (!workspace || next.revision > workspace.revision) {
     if (workspace && next.resetId !== workspace.resetId) {
-      drafts.clear();
+      saver.cancelAll();
       feedback = '';
       activeId = next.activeId;
       setPreview(false);
@@ -182,22 +182,14 @@ async function loadNotes() {
   }
 }
 
-async function saveDraft(id, text, recover = false) {
-  const draft = { text, failed: false };
-  drafts.set(id, draft);
-  renderFeedback();
-  try {
-    const next = await sendAction(recover
-      ? { type: 'recover', id: crypto.randomUUID(), title: 'Recovered note', text, resetId: workspace.resetId }
-      : { type: 'save', id, text });
-    if (drafts.get(id) === draft) drafts.delete(id);
-    applyWorkspace(next);
-  } catch {
-    if (drafts.get(id) !== draft) return;
-    draft.failed = true;
-    renderFeedback();
-  }
-}
+const saver = createDraftSaver({
+  drafts,
+  save: (id, text, recover) => sendAction(recover
+    ? { type: 'recover', id: crypto.randomUUID(), title: 'Recovered note', text, resetId: workspace.resetId }
+    : { type: 'save', id, text }),
+  onSuccess: applyWorkspace,
+  onError: renderFeedback,
+});
 
 async function selectNote(id) {
   activeId = id;
@@ -304,7 +296,7 @@ form.addEventListener('submit', async event => {
   nameInput.readOnly = confirmAction.disabled = cancel.disabled = true;
   try {
     const next = await sendAction(action);
-    if (action.type === 'delete') drafts.delete(action.id);
+    if (action.type === 'delete') saver.cancel(action.id);
     applyWorkspace(next);
     dialog.close();
   } catch {
@@ -323,15 +315,26 @@ function setPreview(showPreview) {
 }
 toggle.addEventListener('click', () => setPreview(preview.hidden));
 
-note.addEventListener('input', () => void saveDraft(activeId, note.value));
+note.addEventListener('input', () => {
+  saver.schedule(activeId, note.value);
+  renderFeedback();
+});
 retry.addEventListener('click', async () => {
   if (loadFailed) await loadNotes();
-  else await Promise.all([...drafts].filter(([, draft]) => draft.failed).map(([id, draft]) =>
-    saveDraft(id, draft.text, !workspace.notes.some(item => item.id === id))));
+  else {
+    const failed = [...drafts].filter(([, draft]) => draft.failed);
+    const saves = failed.map(([id]) => saver.flush(id, !workspace.notes.some(item => item.id === id)));
+    renderFeedback();
+    await Promise.all(saves);
+  }
   if (retry.hidden && document.activeElement === document.body) {
     (preview.hidden ? note : toggle).focus({ preventScroll: true });
   }
 });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) void saver.flushAll();
+});
+window.addEventListener('pagehide', () => void saver.flushAll());
 chrome.storage.onChanged.addListener((changes, area) => {
   const next = changes[SCRATCHPAD_KEY]?.newValue;
   if (area !== 'local' || !next) return;

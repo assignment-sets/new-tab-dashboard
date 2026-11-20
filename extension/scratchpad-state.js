@@ -81,3 +81,84 @@ export function createScratchpadWriter(storage) {
     return result;
   };
 }
+
+/** Coalesces debounced note saves so at most one save per note is in flight. */
+export function createDraftSaver({ drafts, save, onSuccess, onError, delay = 250 }) {
+  const timers = new Map();
+  const inFlight = new Map();
+  const pending = new Map();
+
+  function clearTimer(id) {
+    const timer = timers.get(id);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timers.delete(id);
+    }
+  }
+
+  function flush(id, recover = false) {
+    clearTimer(id);
+    if (inFlight.has(id)) {
+      pending.set(id, Boolean(pending.get(id) || recover));
+      return inFlight.get(id).then(() => inFlight.get(id));
+    }
+    pending.delete(id);
+    const draft = drafts.get(id);
+    if (!draft) return Promise.resolve();
+    draft.failed = false;
+
+    const run = (async () => {
+      try {
+        const next = await save(id, draft.text, recover);
+        if (drafts.get(id) === draft) drafts.delete(id);
+        onSuccess?.(next);
+      } catch {
+        if (drafts.get(id) === draft) {
+          draft.failed = true;
+          onError?.(id, draft);
+        } else if (drafts.has(id) && !timers.has(id)) {
+          pending.set(id, Boolean(pending.get(id) || recover));
+        }
+      } finally {
+        inFlight.delete(id);
+        if (pending.has(id)) {
+          const nextRecover = pending.get(id);
+          pending.delete(id);
+          if (drafts.has(id) && !timers.has(id)) void flush(id, nextRecover);
+        }
+      }
+    })();
+
+    inFlight.set(id, run);
+    return run;
+  }
+
+  function schedule(id, text) {
+    drafts.set(id, { text, failed: false });
+    pending.delete(id);
+    clearTimer(id);
+    timers.set(id, setTimeout(() => {
+      timers.delete(id);
+      void flush(id);
+    }, delay));
+  }
+
+  function flushAll() {
+    const ids = [...new Set([...timers.keys(), ...pending.keys()])];
+    return Promise.all(ids.map(id => flush(id)));
+  }
+
+  function cancel(id) {
+    clearTimer(id);
+    pending.delete(id);
+    drafts.delete(id);
+  }
+
+  function cancelAll() {
+    for (const id of [...timers.keys()]) clearTimer(id);
+    pending.clear();
+    drafts.clear();
+  }
+
+  return { schedule, flush, flushAll, cancel, cancelAll };
+}
