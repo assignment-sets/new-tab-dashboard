@@ -7,7 +7,8 @@ const writeTask = createTaskWriter(chrome.storage.local);
 const writePin = createListWriter(chrome.storage.local, 'pins', changePins);
 const writeScratchpad = createScratchpadWriter(chrome.storage.local);
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id) return;
   if (message?.kind === 'scratchpad-action') {
     writeScratchpad(message.action).then(
       workspace => sendResponse({ ok: true, workspace }),
