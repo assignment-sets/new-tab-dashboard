@@ -6,6 +6,12 @@ A calm, personal dashboard that takes over Chrome's New Tab page.
 
 New Tab Dashboard brings the small things you reach for throughout the day into one place: tasks, pinned sites, a scratchpad, a local clock, and optional weather. It runs as a lightweight Chrome extension and keeps your personal data in the current Chrome profile.
 
+## Screenshots
+
+![New Tab Dashboard preview](docs/assets/newtab-preview.png)
+
+![Toolbar Popup preview](docs/assets/popup-preview.png)
+
 ## What it includes
 
 - **Tasks** — Add, edit, complete, and delete tasks. Switch between current tasks and completed history, or clear everything after confirmation.
