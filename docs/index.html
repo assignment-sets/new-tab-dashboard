@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>New Tab-Dashboard: Local Chrome Extension</title>
+    <meta name="description" content="Tasks, reminders, pinned sites, notes, and pixel weather in one local Chrome new tab extension.">
+    <meta property="og:title" content="New Tab-Dashboard: Local Chrome Extension">
+    <meta property="og:description" content="Tasks, reminders, pinned sites, notes, and pixel weather in one local Chrome new tab extension.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="assets/icon-128.png">
+    <link rel="icon" href="assets/icon-32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="assets/icon-128.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="styles.css">
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <header class="site-nav" id="site-header">
+      <div class="container nav-inner">
+        <a class="brand-link" href="#top">
+          <img src="assets/icon-32.png" srcset="assets/icon-32.png 1x, assets/icon-128.png 4x" alt="" width="24" height="24">
+          <span>New Tab-Dashboard</span>
+        </a>
+
+        <nav class="nav-links" aria-label="Primary">
+          <a href="#features">Features</a>
+          <a href="#install">Install</a>
+          <a href="#docs">Docs</a>
+        </nav>
+
+        <div class="nav-actions">
+          <a class="nav-text-link" href="https://github.com/assignment-sets/new-tab-dashboard" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="btn btn-primary btn-sm" href="https://github.com/assignment-sets/new-tab-dashboard/archive/refs/heads/main.zip" data-download-link>Download</a>
+        </div>
+
+        <button class="nav-toggle" id="mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Toggle menu">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path class="menu-line-top" d="M3 6h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+            <path class="menu-line-mid" d="M3 10h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+            <path class="menu-line-bot" d="M3 14h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="mobile-menu" id="mobile-menu" hidden>
+        <nav class="container mobile-menu-inner" aria-label="Mobile primary">
+          <a href="#features">Features</a>
+          <a href="#install">Install</a>
+          <a href="#docs">Docs</a>
+          <a href="https://github.com/assignment-sets/new-tab-dashboard" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="btn btn-primary" href="https://github.com/assignment-sets/new-tab-dashboard/archive/refs/heads/main.zip" data-download-link>Download .zip</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section id="top" class="hero">
+        <div class="container hero-header hero-enter">
+          <p class="version-pill">v1.1.0 · Manifest V3 · MIT</p>
+          <h1>A quiet, local New Tab-Dashboard.</h1>
+          <p class="hero-subtitle">Tasks, reminders, pinned sites, notes, and pixel weather in one local Chrome tab.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://github.com/assignment-sets/new-tab-dashboard/archive/refs/heads/main.zip" data-download-link>Download .zip</a>
+            <a class="btn btn-secondary" href="#install">How to install</a>
+          </div>
+        </div>
+
+        <div class="container stage-shell">
+          <div class="stage-controls">
+            <div class="segmented" role="tablist" aria-label="Extension surface view">
+              <span class="segmented-thumb" aria-hidden="true"></span>
+              <button type="button" role="tab" id="stage-tab-newtab" aria-selected="true" aria-controls="stage-panel-newtab" data-stage-tab="newtab">New Tab</button>
+              <button type="button" role="tab" id="stage-tab-popup" aria-selected="false" aria-controls="stage-panel-popup" tabindex="-1" data-stage-tab="popup">Toolbar Popup</button>
+            </div>
+          </div>
+
+          <div class="browser-stage">
+            <div class="browser-chrome">
+              <div class="browser-dots" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <div class="browser-tab">
+                <img src="assets/icon-32.png" alt="" width="16" height="16">
+                <span id="browser-tab-label">New Tab</span>
+              </div>
+              <div class="browser-toolbar-bar">
+                <span class="browser-url" id="browser-url-label">chrome://newtab</span>
+                <button class="browser-action-btn" id="chrome-toolbar-action" type="button" title="Toggle New Tab / Toolbar Popup preview" aria-label="Toggle New Tab or Toolbar Popup preview">
+                  <img src="assets/icon-32.png" alt="" width="16" height="16">
+                </button>
+              </div>
+            </div>
+
+            <div id="stage-panel-newtab" role="tabpanel" aria-labelledby="stage-tab-newtab" class="ext-demo">
+              <div class="ext-dashboard">
+                <div class="ext-clock ext-panel">
+                  <div class="ext-clock-overview">
+                    <div class="ext-clock-block">
+                      <div class="ext-clock-time-row">
+                        <time class="ext-clock-time" id="demo-clock-time">
+                          <span class="visually-hidden" id="demo-clock-readable"></span>
+                          <canvas id="demo-clock-digits" width="19" height="5" aria-hidden="true"></canvas>
+                          <span class="ext-clock-period" id="demo-clock-period" aria-hidden="true">AM</span>
+                        </time>
+                      </div>
+                      <div class="ext-year-row" id="demo-year-row">
+                        <span id="demo-clock-year">2026</span>
+                        <canvas id="demo-year-months" width="59" height="2" aria-hidden="true"></canvas>
+                        <span class="ext-year-percent" id="demo-year-percent">89%</span>
+                        <span class="ext-clock-week" id="demo-clock-week">W48</span>
+                      </div>
+                    </div>
+
+                    <div class="ext-clock-calendar">
+                      <p class="ext-calendar-line">
+                        <span class="ext-day-period" id="demo-clock-day-period">Morning</span>
+                        <time id="demo-clock-date"></time>
+                      </p>
+                      <div class="ext-week-days" id="demo-week-days" aria-hidden="true">
+                        <span title="Monday">M</span>
+                        <span title="Tuesday">T</span>
+                        <span title="Wednesday">W</span>
+                        <span title="Thursday">T</span>
+                        <span title="Friday">F</span>
+                        <span title="Saturday">S</span>
+                        <span title="Sunday">S</span>
+                      </div>
+                    </div>
+
+                    <div class="ext-weather-group">
+                      <span class="visually-hidden" id="demo-weather-summary" role="status">18°C, Clear</span>
+                      <div class="ext-weather-now">
+                        <canvas id="demo-weather-icon" width="16" height="16" aria-hidden="true"></canvas>
+                        <canvas id="demo-weather-temp" width="7" height="5" aria-hidden="true"></canvas>
+                        <span class="ext-weather-unit" aria-hidden="true">°C</span>
+                      </div>
+                      <div class="ext-weather-meta">
+                        <button class="ext-weather-cycle" id="demo-weather-condition-btn" type="button" title="Click to cycle weather condition">
+                          <span id="demo-weather-condition">Clear</span>
+                        </button>
+                        <span class="ext-weather-city">Portland, US</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <aside class="ext-workspace ext-panel" id="demo-newtab-workspace" aria-label="Interactive tasks and reminders preview"></aside>
+
+                <section class="ext-scratchpad ext-panel" aria-label="Interactive scratchpad preview">
+                  <div class="ext-panel-bar">
+                    <h2 class="ext-panel-heading">Scratchpad</h2>
+                    <div class="ext-scratchpad-header-actions">
+                      <button class="ext-btn ext-secondary" id="demo-scratchpad-toggle" type="button" aria-pressed="false" aria-controls="demo-scratchpad-note demo-scratchpad-preview">Preview</button>
+                    </div>
+                  </div>
+                  <div class="ext-scratchpad-toolbar">
+                    <div class="ext-scratchpad-tabs" id="demo-scratchpad-tabs" role="tablist" aria-label="Sample notes"></div>
+                    <button class="ext-btn ext-secondary" id="demo-scratchpad-add" type="button" aria-label="New sample note" title="New note">+</button>
+                  </div>
+                  <div class="ext-scratchpad-panel" id="demo-scratchpad-panel" role="tabpanel">
+                    <textarea id="demo-scratchpad-note" rows="6" aria-label="Sample note text" maxlength="16000" placeholder="Write a quick note…"></textarea>
+                    <div class="ext-scratchpad-preview" id="demo-scratchpad-preview" role="region" aria-label="Formatted note preview" tabindex="0" hidden></div>
+                  </div>
+                </section>
+
+                <section class="ext-pins ext-panel" aria-label="Interactive pinned sites preview">
+                  <div class="ext-pins-header ext-panel-bar">
+                    <h2 class="ext-panel-heading">Pinned sites</h2>
+                    <span class="ext-pin-hint">Drag to reorder · Shift+F10 menu</span>
+                  </div>
+                  <ul class="ext-pin-list" id="demo-pin-list"></ul>
+                </section>
+              </div>
+              <div class="ext-item-menu" id="demo-item-menu" role="menu" hidden></div>
+            </div>
+
+            <div id="stage-panel-popup" role="tabpanel" aria-labelledby="stage-tab-popup" class="ext-demo ext-popup-stage" hidden>
+              <div class="ext-popup-backdrop">
+                <div class="ext-popup-window" aria-label="360px toolbar popup preview">
+                  <div class="ext-workspace ext-panel" id="demo-popup-workspace"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="bento-section">
+        <div class="container">
+          <h2>Built for daily tabs.</h2>
+
+          <div class="bento-grid">
+            <article class="bento-tile bento-wide">
+              <div class="bento-tile-top">
+                <h3>Clock &amp; pixel weather</h3>
+                <button class="btn-inline-toggle" id="bento-weather-pause" type="button" aria-pressed="false">Pause</button>
+              </div>
+              <div class="bento-visual ext-demo-card">
+                <div class="bento-year-strip">
+                  <span id="bento-year-label">2026</span>
+                  <canvas id="bento-year-months" width="59" height="2" aria-hidden="true"></canvas>
+                  <span class="bento-year-pct" id="bento-year-percent">89%</span>
+                  <span class="bento-year-week" id="bento-year-week">W48</span>
+                </div>
+                <div class="bento-weather-grid" id="bento-weather-grid" role="group" aria-label="Nine animated weather conditions"></div>
+                <p class="bento-weather-readout" id="bento-weather-status" aria-live="polite">Clear · 2 frames</p>
+              </div>
+              <p class="bento-caption">Live pixel clock, year progress bar, and nine animated Open-Meteo weather icons.</p>
+            </article>
+
+            <article class="bento-tile bento-narrow">
+              <div class="bento-tile-top">
+                <h3>Reminders &amp; toolbar popup</h3>
+                <span class="bento-chip-mono">360px popup</span>
+              </div>
+              <div class="bento-visual ext-demo-card bento-reminders-card">
+                <div class="bento-reminder-bar">
+                  <span class="bento-reminder-label">Remind me in</span>
+                  <span class="bento-reminder-num">5</span>
+                  <div class="bento-units" role="group" aria-label="Preview reminder unit">
+                    <button type="button" data-bento-unit="S" aria-pressed="false" title="Seconds">S</button>
+                    <button type="button" data-bento-unit="M" aria-pressed="true" title="Minutes">M</button>
+                    <button type="button" data-bento-unit="H" aria-pressed="false" title="Hours">H</button>
+                  </div>
+                </div>
+                <div class="bento-reminder-meta">
+                  <span class="bento-pill-dark" id="bento-unit-readout">5m timer · 30s min</span>
+                  <span class="bento-pill-dark">chime.wav</span>
+                  <button class="bento-bell-btn" id="bento-missed-toggle" type="button" aria-expanded="true" aria-controls="bento-missed-card">
+                    Missed inbox
+                    <span class="bento-dot" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div class="bento-missed-card" id="bento-missed-card">
+                  <div>
+                    <strong>Reminder</strong>
+                    <span>Standup sync in 5 minutes</span>
+                  </div>
+                  <span class="bento-dismiss-tag">Dismiss</span>
+                </div>
+              </div>
+              <p class="bento-caption">Timed alarms with a gentle chime, missed-alert inbox, and 360px toolbar popup.</p>
+            </article>
+
+            <article class="bento-tile bento-half">
+              <div class="bento-tile-top">
+                <h3>Markdown scratchpad</h3>
+                <div class="bento-seg" role="group" aria-label="Scratchpad format mode">
+                  <button type="button" id="bento-md-raw" aria-pressed="true">Raw</button>
+                  <button type="button" id="bento-md-preview" aria-pressed="false">Preview</button>
+                </div>
+              </div>
+              <div class="bento-visual ext-demo-card bento-md-card">
+                <pre class="bento-md-raw" id="bento-md-raw-view"># Sprint notes
+- Verify **offline** storage
+- Run `npm test`</pre>
+                <div class="bento-md-preview ext-scratchpad-preview" id="bento-md-preview-view" hidden></div>
+                <div class="bento-md-foot">
+                  <span>250ms autosave</span>
+                  <span>16,000 char limit</span>
+                </div>
+              </div>
+              <p class="bento-caption">Multi-tab notes with debounced autosave and clean Markdown preview.</p>
+            </article>
+
+            <article class="bento-tile bento-half">
+              <div class="bento-tile-top">
+                <h3>Pinned sites</h3>
+                <span class="bento-kbd-cue"><kbd>Shift</kbd>+<kbd>F10</kbd></span>
+              </div>
+              <div class="bento-visual ext-demo-card bento-pins-card">
+                <div class="bento-pins-strip">
+                  <div class="bento-pin-tile">
+                    <span class="ext-pin-mark" aria-hidden="true">G</span>
+                    <span>GitHub</span>
+                  </div>
+                  <div class="bento-pin-tile">
+                    <span class="ext-pin-mark" aria-hidden="true">M</span>
+                    <span>MDN Docs</span>
+                  </div>
+                  <span class="bento-drop-bar" aria-hidden="true"></span>
+                  <div class="bento-pin-tile is-dragging">
+                    <span class="ext-pin-mark" aria-hidden="true">L</span>
+                    <span>Localhost</span>
+                  </div>
+                </div>
+                <div class="bento-context-preview" aria-hidden="true">
+                  <span>Edit</span>
+                  <span>Move earlier</span>
+                  <span class="is-danger">Remove</span>
+                </div>
+              </div>
+              <p class="bento-caption">Drag to reorder shortcuts with automatic favicons and full keyboard menus.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="install" class="install-section">
+        <div class="container">
+          <div class="install-header">
+            <div>
+              <h2>Install in under a minute.</h2>
+              <p class="section-lead">Not on the Chrome Web Store yet. Load the open-source folder directly in Chrome.</p>
+            </div>
+            <div class="segmented segmented-sm" role="tablist" aria-label="Install method">
+              <span class="segmented-thumb" aria-hidden="true"></span>
+              <button type="button" role="tab" id="install-tab-zip" aria-selected="true" aria-controls="install-step-zip" data-install-mode="zip">ZIP</button>
+              <button type="button" role="tab" id="install-tab-git" aria-selected="false" aria-controls="install-step-git" tabindex="-1" data-install-mode="git">Git</button>
+            </div>
+          </div>
+
+          <ol class="install-list">
+            <li class="install-row" id="install-step-zip" data-install-panel="zip">
+              <span class="step-num" aria-hidden="true">1</span>
+              <div class="install-row-copy">
+                <h3>Download &amp; unzip</h3>
+                <p>Save the archive and extract it to a permanent folder.</p>
+              </div>
+              <div class="install-row-action">
+                <div class="install-bar">
+                  <code>new-tab-dashboard-main.zip</code>
+                  <a class="btn btn-primary btn-sm" href="https://github.com/assignment-sets/new-tab-dashboard/archive/refs/heads/main.zip" data-download-link>Download .zip</a>
+                </div>
+              </div>
+            </li>
+
+            <li class="install-row" id="install-step-git" data-install-panel="git" hidden>
+              <span class="step-num" aria-hidden="true">1</span>
+              <div class="install-row-copy">
+                <h3>Clone the repository</h3>
+                <p>Clone locally so updates stay one pull away.</p>
+              </div>
+              <div class="install-row-action">
+                <div class="install-bar install-bar-cmd">
+                  <code class="install-cmd"><span class="cmd-prompt" aria-hidden="true">$</span>git clone https://github.com/assignment-sets/new-tab-dashboard.git</code>
+                  <button class="install-copy-btn" type="button" data-copy-text="git clone https://github.com/assignment-sets/new-tab-dashboard.git" aria-label="Copy git clone command">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="6" y="6" width="8" height="8" rx="1.5" />
+                      <path d="M10 4V3.5A1.5 1.5 0 0 0 8.5 2h-5A1.5 1.5 0 0 0 2 3.5v5A1.5 1.5 0 0 0 3.5 10H4" />
+                    </svg>
+                    <span class="copy-label">Copy</span>
+                  </button>
+                </div>
+              </div>
+            </li>
+
+            <li class="install-row">
+              <span class="step-num" aria-hidden="true">2</span>
+              <div class="install-row-copy">
+                <h3>Open Chrome extensions</h3>
+                <p>Paste into your address bar and turn on Developer mode.</p>
+              </div>
+              <div class="install-row-action">
+                <div class="install-bar install-bar-cmd">
+                  <code>chrome://extensions</code>
+                  <button class="install-copy-btn" type="button" data-copy-text="chrome://extensions" aria-label="Copy chrome://extensions URL">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="6" y="6" width="8" height="8" rx="1.5" />
+                      <path d="M10 4V3.5A1.5 1.5 0 0 0 8.5 2h-5A1.5 1.5 0 0 0 2 3.5v5A1.5 1.5 0 0 0 3.5 10H4" />
+                    </svg>
+                    <span class="copy-label">Copy</span>
+                  </button>
+                </div>
+              </div>
+            </li>
+
+            <li class="install-row">
+              <span class="step-num" aria-hidden="true">3</span>
+              <div class="install-row-copy">
+                <h3>Load the extension folder</h3>
+                <p>Click Load unpacked and pick the extension subfolder.</p>
+              </div>
+              <div class="install-row-action">
+                <div class="install-bar">
+                  <code>new-tab-dashboard / <mark>extension/</mark></code>
+                  <span class="install-bar-tag">Select folder</span>
+                </div>
+              </div>
+            </li>
+
+            <li class="install-row">
+              <span class="step-num" aria-hidden="true">4</span>
+              <div class="install-row-copy">
+                <h3>Keep it &amp; pin</h3>
+                <p>Open a new tab, choose Keep it, and pin New Tab-Dashboard.</p>
+              </div>
+              <div class="install-row-action">
+                <div class="install-bar">
+                  <span class="install-cue"><span>New tab prompt</span><span class="install-sep" aria-hidden="true">&rarr;</span><strong>Keep it</strong></span>
+                  <span class="install-bar-tag install-pin-tag"><img src="assets/icon-32.png" srcset="assets/icon-32.png 1x, assets/icon-128.png 4x" alt="" width="14" height="14">Pin icon</span>
+                </div>
+              </div>
+            </li>
+          </ol>
+
+          <p class="install-footnote">Also works in Brave, Edge, Arc, and Vivaldi via their extensions page.</p>
+          <p class="visually-hidden" id="copy-status" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section id="docs" class="docs-section">
+        <div class="container">
+          <h2>Details &amp; privacy.</h2>
+
+          <div class="docs-tablist" role="tablist" aria-label="Documentation sections">
+            <button type="button" role="tab" id="docs-tab-privacy" aria-selected="true" aria-controls="docs-panel-privacy">Privacy &amp; Permissions</button>
+            <button type="button" role="tab" id="docs-tab-syntax" aria-selected="false" aria-controls="docs-panel-syntax" tabindex="-1">Shortcuts &amp; Syntax</button>
+            <button type="button" role="tab" id="docs-tab-faq" aria-selected="false" aria-controls="docs-panel-faq" tabindex="-1">Updating &amp; FAQ</button>
+          </div>
+
+          <div class="docs-panel" id="docs-panel-privacy" role="tabpanel" aria-labelledby="docs-tab-privacy">
+            <div class="table-wrap">
+              <table class="docs-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Permission</th>
+                    <th scope="col">Scope</th>
+                    <th scope="col">Purpose</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td data-label="Permission"><code>storage</code></td>
+                    <td data-label="Scope">Required</td>
+                    <td data-label="Purpose">Saves tasks, reminders, pinned sites, notes, and weather city in local extension storage.</td>
+                  </tr>
+                  <tr>
+                    <td data-label="Permission"><code>alarms</code></td>
+                    <td data-label="Scope">Required</td>
+                    <td data-label="Purpose">Schedules the next pending reminder so timers fire even when no New Tab is open.</td>
+                  </tr>
+                  <tr>
+                    <td data-label="Permission"><code>offscreen</code></td>
+                    <td data-label="Scope">Required</td>
+                    <td data-label="Purpose">Plays the local chime audio file when a timed reminder becomes due.</td>
+                  </tr>
+                  <tr>
+                    <td data-label="Permission"><code>notifications</code></td>
+                    <td data-label="Scope">Optional</td>
+                    <td data-label="Purpose">Requested only if you opt into desktop alerts; missed reminders otherwise stay in the inbox popover.</td>
+                  </tr>
+                  <tr>
+                    <td data-label="Permission"><code>open-meteo.com</code></td>
+                    <td data-label="Scope">Optional host</td>
+                    <td data-label="Purpose">Queried only when searching for a city or refreshing current weather forecasts.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="docs-note">All data stays in your Chrome profile. Clearing cache or history keeps it; uninstalling removes it.</p>
+          </div>
+
+          <div class="docs-panel" id="docs-panel-syntax" role="tabpanel" aria-labelledby="docs-tab-syntax" hidden>
+            <div class="syntax-grid">
+              <div class="docs-subcard">
+                <h3>Keyboard &amp; context menus</h3>
+                <dl class="spec-list">
+                  <div>
+                    <dt><kbd>Right-click</kbd></dt>
+                    <dd>Open context menu on pinned sites or note tabs</dd>
+                  </div>
+                  <div>
+                    <dt><kbd>Shift</kbd>+<kbd>F10</kbd></dt>
+                    <dd>Open context menu from keyboard focus</dd>
+                  </div>
+                  <div>
+                    <dt><kbd>ContextMenu</kbd></dt>
+                    <dd>Open context menu using dedicated menu key</dd>
+                  </div>
+                  <div>
+                    <dt><kbd>ArrowLeft</kbd> / <kbd>ArrowRight</kbd></dt>
+                    <dd>Cycle between mode, status, and note tabs</dd>
+                  </div>
+                  <div>
+                    <dt><kbd>Home</kbd> / <kbd>End</kbd></dt>
+                    <dd>Jump to the first or last tab in a tablist</dd>
+                  </div>
+                  <div>
+                    <dt>Double-click tab</dt>
+                    <dd>Rename the selected scratchpad note</dd>
+                  </div>
+                  <div>
+                    <dt><kbd>Esc</kbd></dt>
+                    <dd>Close open dialogs, menus, or reminder popovers</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div class="docs-subcard">
+                <h3>Scratchpad syntax &amp; limits</h3>
+                <dl class="spec-list">
+                  <div>
+                    <dt><code>#</code> to <code>###</code></dt>
+                    <dd>Section headings rendered in preview mode</dd>
+                  </div>
+                  <div>
+                    <dt><code>-</code>, <code>*</code>, <code>+</code></dt>
+                    <dd>Unordered bullet list items</dd>
+                  </div>
+                  <div>
+                    <dt><code>**bold**</code></dt>
+                    <dd>Strong emphasis span inline</dd>
+                  </div>
+                  <div>
+                    <dt><code>`code`</code></dt>
+                    <dd>Monospace inline code span</dd>
+                  </div>
+                  <div>
+                    <dt><code>&lt;html&gt;</code></dt>
+                    <dd>Kept as literal text, never interpreted as markup</dd>
+                  </div>
+                </dl>
+                <ul class="limits-row" aria-label="Storage and validation limits">
+                  <li><strong>240</strong> chars/task</li>
+                  <li><strong>60</strong> chars/note title</li>
+                  <li><strong>16,000</strong> chars/note</li>
+                  <li><strong>30s</strong> min reminder</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="docs-panel" id="docs-panel-faq" role="tabpanel" aria-labelledby="docs-tab-faq" hidden>
+            <div class="faq-list">
+              <details class="faq-item">
+                <summary>How do I update without losing my data?</summary>
+                <p>Download the latest archive or run <code>git pull</code>, replace the files in your unpacked directory, and click <strong>Reload</strong> on <code>chrome://extensions</code>. All tasks, notes, pins, and weather settings stay intact in Chrome profile storage.</p>
+              </details>
+              <details class="faq-item">
+                <summary>Why isn't it on the Chrome Web Store?</summary>
+                <p>Distributing unpacked source keeps the extension simple to inspect, modify, and run locally without store packaging or external tracking.</p>
+              </details>
+              <details class="faq-item">
+                <summary>What if another extension controls my New Tab page?</summary>
+                <p>Chrome allows one active New Tab override per profile. Disable the conflicting extension on <code>chrome://extensions</code>, or select <strong>Keep it</strong> when Chrome prompts on your first new tab.</p>
+              </details>
+              <details class="faq-item">
+                <summary>How do I run tests locally?</summary>
+                <p>Install Node.js 20 or later, open the repository root in a terminal, and run <code>npm test</code>. The project uses native ES modules with zero build step and zero runtime dependencies.</p>
+              </details>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <div class="footer-brand">
+          <img src="assets/icon-32.png" srcset="assets/icon-32.png 1x, assets/icon-128.png 4x" alt="" width="20" height="20">
+          <span>New Tab-Dashboard v1.1.0 · MIT License</span>
+        </div>
+        <div class="footer-links">
+          <a href="https://github.com/assignment-sets/new-tab-dashboard" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/assignment-sets/new-tab-dashboard/issues" target="_blank" rel="noopener noreferrer">Issues</a>
+          <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Weather by Open-Meteo</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
