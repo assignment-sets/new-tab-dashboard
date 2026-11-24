@@ -2,6 +2,8 @@
 
 A calm, personal dashboard that takes over Chrome's New Tab page.
 
+**Live site:** https://assignment-sets.github.io/new-tab-dashboard/
+
 New Tab Dashboard brings the small things you reach for throughout the day into one place: tasks, pinned sites, a scratchpad, a local clock, and optional weather. It runs as a lightweight Chrome extension and keeps your personal data in the current Chrome profile.
 
 ## What it includes
@@ -46,6 +48,7 @@ Tests require Node.js 20 or later. After changing files in `extension`, reload *
 
 ```text
 extension/   Chrome extension source and assets
+docs/        Static landing page published to GitHub Pages
 test/        Node.js tests for task, pin, scratchpad, and weather logic
 ```
 
